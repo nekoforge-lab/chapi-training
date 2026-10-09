@@ -24,7 +24,16 @@ function migrate(raw){validateStore(raw);const s=clone(raw);if((s.schemaRevision
 function normalizeDay(d){return {...{weight:'',calories:'',note:'',sessions:[],meals:{}},...clone(d||{}),sessions:clone(d?.sessions||[]),meals:clone(d?.meals||{})}}
 function weightAt(s,on,d){if(numeric(d?.weight)&&Number(d.weight)>0)return {weight:Number(d.weight),date:on};const ds=Object.keys(s.days).filter(k=>k<=on&&numeric(s.days[k].weight)&&Number(s.days[k].weight)>0).sort();if(!ds.length)return null;const k=ds.at(-1);return {weight:Number(s.days[k].weight),date:k}}
 function baseEnergy(s,on,d){const p=s.profile||{},a=age(p.birth,on),w=weightAt(s,on,d),h=Number(p.height),activity=Number(p.lifeActivity);if(a===null||a<18||!w||!(h>=80&&h<=250)||!['male','female'].includes(p.sex)||![1.2,1.375,1.55,1.725].includes(activity))return null;const bmr=10*w.weight+6.25*h-5*a+(p.sex==='male'?5:-161);return bmr>0?{bmr,life:bmr*activity,activity,age:a,w}:null}
-function exerciseEnergy(d,bmr){let net=0,raw=0,missing=0,unresolved=0;for(const sess of d.sessions||[])for(const it of sess.items||[]){if(!numeric(it.kcal)){missing++;continue}raw+=Number(it.kcal);if(!nonnegative(it.kcal)){unresolved++;continue}if(it.energyType==='net')net+=Number(it.kcal);else if(it.energyType==='gross'&&nonnegative(it.minutes)&&Number(it.minutes)>0&&bmr){net+=Math.max(0,Number(it.kcal)-bmr*Number(it.minutes)/1440)}else unresolved++}return {net,raw,missing,unresolved}}
+function exerciseEnergy(d,bmr){let net=0,raw=0,missing=0,unresolved=0;
+ const records=[];const strength=(d.strengthWorkout||{});const hasStrength=(d.sessions||[]).some(sess=>(sess.items||[]).some(it=>it.kind!=='cardio'));
+ // Historical strength-item calories are preserved in storage but never counted.
+ if(hasStrength||numeric(strength.kcal))records.push(strength);
+ for(const sess of d.sessions||[])for(const it of sess.items||[])if(it.kind==='cardio')records.push(it);
+ for(const it of records){if(!numeric(it.kcal)){missing++;continue}raw+=Number(it.kcal);if(!nonnegative(it.kcal)){unresolved++;continue}
+ if(it.energyType==='net')net+=Number(it.kcal);
+ else if(it.energyType==='gross'&&nonnegative(it.minutes)&&Number(it.minutes)>0&&bmr)net+=Math.max(0,Number(it.kcal)-bmr*Number(it.minutes)/1440);
+ else unresolved++}
+ return {net,raw,missing,unresolved}}
 function foodTotals(d){const t={kcal:0,p:0,f:0,c:0},count={kcal:0,p:0,f:0,c:0};for(const [key] of meals)for(const f of Object.keys(t)){const v=d.meals?.[key]?.[f];if(nonnegative(v)){t[f]+=Number(v);count[f]++}}return {total:t,count,complete:d.foodComplete===true||count.kcal===4,hasMark:Object.values(d.meals||{}).some(m=>m&&Object.values(m).some(v=>v!==''))}}
 function energy(s,on,day){const d=day||normalizeDay(s.days[on]),base=baseEnergy(s,on,d),exercise=exerciseEnergy(d,base?.bmr),food=foodTotals(d),total=base&&!exercise.unresolved?base.life+exercise.net:null,balance=total!==null&&food.count.kcal>0?food.total.kcal-total:null;return {base,exercise,food,total,balance,provisional:!food.complete||exercise.missing>0||exercise.unresolved>0,legacy:nonnegative(d.calories)&&!d.legacyCaloriesResolved}}
 function previous(s,id,on){for(const d of Object.keys(s.days).filter(x=>x<on).sort().reverse())for(const sess of [...(s.days[d].sessions||[])].reverse())for(const it of [...(sess.items||[])].reverse())if(it.id===id)return {date:d,item:it};return null}
