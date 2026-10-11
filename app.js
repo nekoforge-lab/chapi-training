@@ -1,5 +1,5 @@
 (()=>{'use strict';
-const C=ChapiCore,KEY='chapi-training-v2',OLDKEY='chapi-training-v1',BACKUP='chapi-training-v2-before-v3',RESTORE='chapi-training-before-restore',VERSION='3.4';
+const C=ChapiCore,KEY='chapi-training-v2',OLDKEY='chapi-training-v1',BACKUP='chapi-training-v2-before-v3',RESTORE='chapi-training-before-restore',VERSION='3.5-test';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),today=()=>C.iso(new Date()),round=(n,d=0)=>Number(n).toLocaleString('ja-JP',{maximumFractionDigits:d}),signed=n=>(n>0?'+':n===0?'±':'')+round(n),color=n=>n===null?'':n<0?'negative':n>0?'positive':'neutral';
 let store,blocked=false,recoveryExported=false,externalConflict=false,rawOriginal='',current=today(),draft,savedDraft='',activeTab='record',month=current.slice(0,7)+'-01',selectedDetail=current,editing=null,targetsDraft=null,goalDraft=null,graphMode='weight',graphWeek=current,noticeTimer,settingsDirty=false,loadedToday=today();
 const dirtySections=new Set();function markDirty(section){dirtySections.add(section);settingsDirty=true}function cleanSection(section){dirtySections.delete(section);settingsDirty=dirtySections.size>0}
@@ -8,11 +8,13 @@ function download(obj,name){const a=document.createElement('a'),u=URL.createObje
 try{rawOriginal=localStorage.getItem(KEY)||'';const old=localStorage.getItem(OLDKEY);store=rawOriginal?C.migrate(JSON.parse(rawOriginal)):old?C.migrate(C.fromV1(JSON.parse(old))):C.fresh();if(rawOriginal&&Number(JSON.parse(rawOriginal).schemaRevision||0)<3&&!localStorage.getItem(BACKUP))localStorage.setItem(BACKUP,rawOriginal)}catch(e){blocked=true;store=C.fresh();$('fatal').classList.remove('hidden');$('fatal').innerHTML='<b>保存データを安全に読み込めませんでした。</b><p>元データを上書きせず、保存を停止しています。</p><button id="recoverRaw">元データを書き出す</button><p>'+esc(e.message)+'</p>';$('recoverRaw').onclick=()=>{download(rawOriginal||'', 'chapi-recovery.json');recoveryExported=true;notice('元データを書き出しました。設定から正常なバックアップを復元できます。')}}
 function persist(next=store){if(blocked){notice('元データ保護のため保存を停止しています。先に書き出してください。');return false}try{localStorage.setItem(KEY,JSON.stringify(next));store=next;return true}catch(e){notice('保存できませんでした。入力は画面に残っています。空き容量を確認しバックアップしてください。');return false}}
 // Do not overwrite storage at startup: migration is committed only on an explicit save.
-function chooseDate(day){current=day;draft=C.normalizeDay(store.days[day]);savedDraft=JSON.stringify(draft);$('recordDate').value=day;$('weight').value=draft.weight??'';$('daynote').value=draft.note||'';$('restDay').checked=!!draft.restDay;renderExercises();renderStrengthTotal();renderFood();renderEnergy();renderWeek()}
-function sync(){if(!draft)return;draft.weight=$('weight').value;draft.note=$('daynote').value;draft.restDay=$('restDay').checked;}
+function chooseDate(day){current=day;draft=C.normalizeDay(store.days[day]);savedDraft=JSON.stringify(draft);$('recordDate').value=day;$('weight').value=draft.weight??'';$('daynote').value=draft.note||'';$('restDay').checked=!!draft.restDay;$('watchEnabled').checked=!!draft.watchEnabled;$('watchMode').value=draft.watchMode==='active'?'active':'total';$('watchTotalKcal').value=draft.watchTotalKcal??'';renderWatch();renderExercises();renderStrengthTotal();renderFood();renderEnergy();renderWeek()}
+function sync(){if(!draft)return;draft.weight=$('weight').value;draft.note=$('daynote').value;draft.restDay=$('restDay').checked;draft.watchEnabled=$('watchEnabled').checked;draft.watchMode=$('watchMode').value;draft.watchTotalKcal=$('watchTotalKcal').value;}
+function renderWatch(){const on=$('watchEnabled').checked,active=$('watchMode').value==='active';$('watchInputRow').classList.toggle('hidden',!on);$('watchKcalLabel').textContent=active?'アクティブ消費カロリー（kcal）':'1日の総消費カロリー（kcal）';$('watchHint').textContent=!on?'従来の推定消費を使用します。':active?'推定基礎代謝（BMR）＋アクティブ消費で概算します。生活活動係数・記録済み運動は追加しません。プロフィール不足や空欄の場合は従来計算に戻ります。':'総消費をそのまま採用します。生活活動係数・運動消費は追加しません。空欄の場合は従来計算に戻ります。';}
 function dayDirty(){sync();return JSON.stringify(draft)!==savedDraft}
 function changeDate(day){if(!C.date(day)){notice('日付を確認してください');return false}if(day!==current&&dayDirty()&&!confirm('未保存の変更があります。保存せず日付を切り替えますか？')){$('recordDate').value=current;return false}if(day!==current)chooseDate(day);return true}
 function saveDay(){sync();if(draft.weight!==''&&(!C.nonnegative(draft.weight)||Number(draft.weight)<1||Number(draft.weight)>500)){notice('体重は1〜500 kgで入力してください');return false}for(const [key] of C.meals)for(const f of ['kcal','p','f','c']){const v=draft.meals?.[key]?.[f];if(v!==''&&v!=null&&!C.nonnegative(v)){notice('食事は0以上の数値で入力してください');return false}}if(draft.strengthWorkout){for(const f of ['minutes','kcal']){const v=draft.strengthWorkout[f];if(v!==''&&v!=null&&!C.nonnegative(v)){notice('筋トレ全体の時間・消費カロリーは0以上にしてください');return false}}}for(const sess of draft.sessions)for(const it of sess.items){for(const f of ['minutes','km','steps','kcal','rounds'])if(it[f]!==''&&it[f]!=null&&!C.nonnegative(it[f])){notice('運動の数値は0以上にしてください');return false}for(const st of it.sets||[])for(const f of ['kg','reps','rir'])if(st[f]!==''&&st[f]!=null&&!C.nonnegative(st[f])){notice('セットの数値を確認してください');return false}}// Flag unusually large newly-entered food values without rewriting older records.
+if(draft.watchEnabled&&draft.watchTotalKcal!==''&&(!Number.isInteger(Number(draft.watchTotalKcal))||Number(draft.watchTotalKcal)<=0)){notice('ウォッチの消費カロリーは1以上の整数で入力してください');return false}
 const originalMeals=C.normalizeDay(store.days[current]).meals;
 const unusual=[];
 for(const [meal,name] of C.meals)for(const [field,unit,limit] of [['kcal','kcal',10000],['p','g',1000],['f','g',1000],['c','g',1000]]){
@@ -23,6 +25,19 @@ for(const [meal,name] of C.meals)for(const [field,unit,limit] of [['kcal','kcal'
 }
 if(unusual.length&&!confirm('食事に通常より大きな数値があります。入力ミスではありませんか？\n'+unusual.join('\n')+'\nこの数値で保存しますか？'))return false;
 const next=C.clone(store);next.days[current]=C.clone(draft);if(!persist(next))return false;savedDraft=JSON.stringify(draft);notice('この日の記録と食事を保存しました');renderEnergy();renderWeek();if(activeTab==='calendar')renderCalendar();return true}
+function saveOneMeal(key){
+ const meal=draft.meals?.[key];if(!meal){notice('食事の入力がありません');return false}
+ for(const f of ['kcal','p','f','c']){const v=meal[f];if(v!==''&&v!=null&&!C.nonnegative(v)){notice('食事は0以上の数値で入力してください');return false}}
+ const next=C.clone(store),base=C.normalizeDay(next.days[current]);
+ base.meals[key]=C.clone(meal);
+ next.days[current]=base;
+ if(!persist(next))return false;
+ // 保存した食事だけを保存済みスナップショットに反映。ほかの未保存入力は保持。
+ const snapshot=JSON.parse(savedDraft);snapshot.meals[key]=C.clone(meal);savedDraft=JSON.stringify(snapshot);
+ notice((C.meals.find(m=>m[0]===key)?.[1]||'食事')+'を保存しました ✓');
+ renderFoodSummary();renderEnergy();renderWeek();return true;
+}
+function aiDiscard(){aiPending=null;$('aiAccept').disabled=true;$('aiAcceptTop').disabled=true;$('aiPreview').replaceChildren();}
 function switchTab(name){if(name===activeTab)return;if(activeTab==='settings'&&name!=='settings'&&settingsDirty&&!confirm('設定に未保存の変更があります。設定を保存せず移動しますか？'))return;sync();activeTab=name;for(const p of document.querySelectorAll('.page'))p.classList.toggle('hidden',p.id!==name);document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));if(name==='record'){renderEnergy();renderWeek()}if(name==='food')renderFood();if(name==='calendar')renderCalendar();if(name==='progress')renderGraphs();if(name==='history')renderHistory();if(name==='templates')renderTemplates();if(name==='settings'){renderSettings();dirtySections.clear();settingsDirty=false}window.scrollTo?.({top:0,behavior:'smooth'})}
 function numberInput(label,value,change,{step='0.1',min='0',max,placeholder='未入力'}={}){const box=document.createElement('label');box.textContent=label;const input=document.createElement('input');input.type='number';input.inputMode=step==='1'?'numeric':'decimal';input.min=min;input.step=step;if(max)input.max=max;input.value=value??'';input.placeholder=placeholder;input.oninput=()=>change(input.value);box.append(input);return box}
 function textInput(label,value,change,area=false){const box=document.createElement('label');box.textContent=label;const input=document.createElement(area?'textarea':'input');input.value=value??'';input.oninput=()=>change(input.value);box.append(input);return box}
@@ -38,7 +53,8 @@ if(it.tracking==='rounds'&&!Array.isArray(it.sets)){wrap.append(numberInput('周
 if(kind==='cardio'){const vals=document.createElement('div');vals.className='two';vals.append(numberInput('運動時間（分）',it.minutes,v=>{it.minutes=v;renderEnergy()},{step:'0.1'}));if(kind==='cardio'&&!it.noDistance)vals.append(numberInput('距離（km）',it.km,v=>it.km=v,{step:'0.01'}));if(kind==='cardio'&&!it.noDistance)vals.append(numberInput('歩数（歩・任意）',it.steps,v=>it.steps=v,{step:'1'}));wrap.append(vals);
 const energyBox=document.createElement('div');energyBox.className='energy-inputs';energyBox.innerHTML='<h4>この運動の消費カロリー</h4>';energyBox.append(numberInput('入力値（kcal・空欄で削除）',it.kcal,v=>{it.kcal=v;renderEnergy()},{step:'1'}),selectInput('入力値の区分',it.energyType||'unknown',[['unknown','未確認（合計は未算出）'],['net','正味消費（安静時分を含まない）'],['gross','総消費（安静時分を含む）']],v=>{it.energyType=v;renderEnergy()}));const hint=document.createElement('p');hint.className='hint';hint.textContent='総消費は運動時間が必要です。まとめて計測したカロリーは一つの記録だけに入力し、各種目への重複入力を避けてください。未入力分は加算しません。';energyBox.append(hint);wrap.append(energyBox)}wrap.append(textInput('備考',it.note,v=>it.note=v,true));root.append(wrap)}));if(!count)root.innerHTML='<p class="hint">まだ登録がありません。メニューを選んで追加できます。</p>'}}
 function renderLegacy(){const box=$('legacyEnergy');box.classList.toggle('hidden',!C.numeric(draft.calories));if(!C.numeric(draft.calories))return;box.innerHTML='<h2>旧記録の活動カロリー</h2><p>'+esc(draft.calories)+' kcal <small>元の入力値を保持</small></p><p class="hint">運動以外の活動を含む可能性があるため、運動の合計へは自動加算しません。内容が確認できた運動だけを個別登録してください。</p>';const label=document.createElement('label');label.className='check';const ck=document.createElement('input');ck.type='checkbox';ck.checked=!!draft.legacyCaloriesResolved;ck.onchange=()=>{draft.legacyCaloriesResolved=ck.checked;renderEnergy()};label.append(ck,'内容を確認済み（元の値は残す）');box.append(label)}
-function renderEnergy(){if(!draft)return;sync();const e=C.energy(store,current,draft),target=Number(store.foodTargets?.kcal)||2000;$('energyHeading').textContent='デイリーエネルギー';$('energyDate').textContent=current+(current===today()?' · 今日':'');$('totalEnergy').textContent=e.total===null?'—':round(e.total);$('energyBreakdown').textContent=e.base?`生活消費 ${round(e.base.life)} kcal ＋ 運動追加消費 ${round(e.exercise.net)} kcal${e.exercise.unresolved?'（確認済み分）':''}`:'プロフィール・生活活動・体重を設定すると表示します。';const cautions=[];if(e.exercise.unresolved)cautions.push('運動の区分／時間が未確認のため総消費は未算出です。');if(e.exercise.missing)cautions.push('運動カロリーの空欄は加算していません。');if(!draft.sessions.length)cautions.push('登録された運動の追加消費は0 kcalです（実際の運動量が0とは限りません）。');if(!e.food.complete)cautions.push('食事入力が未完了のため収支は暫定です。');if(e.legacy)cautions.push('旧活動カロリーは未確認・合計対象外です。');$('energyCaution').textContent=cautions.join(' ');$('intakeValue').textContent=e.food.count.kcal?round(e.food.total.kcal):'—';$('balanceValue').textContent=e.balance===null?'—':signed(e.balance);$('balanceValue').className=color(e.balance);
+$('watchEnabled').addEventListener('change',()=>{sync();renderWatch();renderEnergy()});$('watchTotalKcal').addEventListener('input',()=>{sync();renderEnergy()});$('watchMode').addEventListener('change',()=>{sync();renderWatch();renderEnergy()});
+function renderEnergy(){if(!draft)return;sync();const e=C.energy(store,current,draft),target=Number(store.foodTargets?.kcal)||2000;$('energyHeading').textContent='デイリーエネルギー';$('energyDate').textContent=current+(current===today()?' · 今日':'');$('totalEnergy').textContent=e.total===null?'—':round(e.total);$('energyBreakdown').textContent=e.watch?(e.watchMode==='active'?'推定基礎代謝＋ウォッチのアクティブ消費（運動の重複加算なし）':'スマートウォッチ入力の総消費を採用（運動消費の追加なし）'):e.base?`生活消費 ${round(e.base.life)} kcal ＋ 運動追加消費 ${round(e.exercise.net)} kcal${e.exercise.unresolved?'（確認済み分）':''}`:'プロフィール・生活活動・体重を設定すると表示します。';const cautions=[];if(!e.watch&&e.exercise.unresolved)cautions.push('運動の区分／時間が未確認のため総消費は未算出です。');if(!e.watch&&e.exercise.missing)cautions.push('運動カロリーの空欄は加算していません。');if(!draft.sessions.length)cautions.push('登録された運動の追加消費は0 kcalです（実際の運動量が0とは限りません）。');if(!e.food.complete)cautions.push('食事入力が未完了のため収支は暫定です。');if(e.legacy)cautions.push('旧活動カロリーは未確認・合計対象外です。');$('energyCaution').textContent=cautions.join(' ');$('intakeValue').textContent=e.food.count.kcal?round(e.food.total.kcal):'—';$('balanceValue').textContent=e.balance===null?'—':signed(e.balance);$('balanceValue').className=color(e.balance);
  const donut=$('energyDonut'),status=$('balanceStatus');
  // ゲージの割合は収支の絶対値 / 総消費。100%を上限とし、数値は切り詰めない。
  const valid=e.balance!==null&&e.total!==null&&e.total>0;
@@ -47,7 +63,7 @@ function renderEnergy(){if(!draft)return;sync();const e=C.energy(store,current,d
  const isPlus=valid&&e.balance>0,isMinus=valid&&e.balance<0;
  // The outer donut segments show life expenditure and separately logged net exercise.
  // Balance is still reported numerically in the centre; no exercise is double-counted.
- const life=Number(e.base?.life)||0,exercise=Number(e.exercise?.net)||0;
+ const life=e.watch?Number(e.total):Number(e.base?.life)||0,exercise=e.watch?0:Number(e.exercise?.net)||0;
  const exerciseAngle=e.total!==null&&e.total>0?Math.max(0,Math.min(360,360*exercise/e.total)):0;
  donut.style.setProperty('--exercise-angle',exerciseAngle+'deg');
  donut.classList.toggle('energy-breakdown-ready',e.total!==null&&e.total>0);
@@ -58,30 +74,39 @@ function renderEnergy(){if(!draft)return;sync();const e=C.energy(store,current,d
  donut.setAttribute('aria-label',valid?`カロリー収支 ${signed(e.balance)} kcal、${status.textContent}`:'カロリー収支は未算出');
  $('energyBmr').textContent=e.base?round(e.base.bmr):'—';
  $('energyExercise').textContent=e.base?round(e.exercise.net):'—';
- $('energyActivity').textContent=e.base?round(Math.max(0,e.base.life-e.base.bmr)):'—';const adjusted=target+Math.round(e.exercise.net*.7);$('baseDailyTarget').textContent=round(target)+' kcal';$('dailyTarget').textContent=round(adjusted)+' kcal';$('dailyProgress').value=Math.min(100,e.food.total.kcal/adjusted*100);$('dailyRemaining').textContent=e.food.count.kcal?(e.food.total.kcal<=adjusted?'今日の目標まで残り '+round(adjusted-e.food.total.kcal):'今日の目標を '+round(e.food.total.kcal-adjusted)+' 超過')+' kcal':'食事を入力すると進捗を表示します。';renderMascot(e,adjusted);$('energyDetails').innerHTML=e.base?`<p>基礎代謝 ${round(e.base.bmr)} kcal / 日<br>生活活動係数 ×${e.base.activity}<br>参照体重 ${e.base.w.weight} kg（${e.base.w.date}）<br>年齢 ${e.base.age}歳<br>体重維持の推定値 ${e.total===null?'未算出':round(e.total)+' kcal / 日'}<br>減量参考値 ${round(e.base.life-Math.min(400,e.base.life*.15))} kcal / 日（生活消費から最大15%・400 kcalを差し引く概算）</p>`:'<p class="hint">成人プロフィールと過去または当日の体重記録が必要です。</p>';}
+ $('energyActivity').textContent=e.base?round(Math.max(0,e.base.life-e.base.bmr)):'—';const adjusted=target+Math.round((e.watch?0:e.exercise.net)*.7);$('baseDailyTarget').textContent=round(target)+' kcal';$('dailyTarget').textContent=round(adjusted)+' kcal';$('dailyProgress').value=Math.min(100,e.food.total.kcal/adjusted*100);$('dailyRemaining').textContent=e.food.count.kcal?(e.food.total.kcal<=adjusted?'今日の目標まで残り '+round(adjusted-e.food.total.kcal):'今日の目標を '+round(e.food.total.kcal-adjusted)+' 超過')+' kcal':'食事を入力すると進捗を表示します。';renderMascot(e,adjusted);$('energyDetails').innerHTML=e.watch?'<p>'+(e.watchMode==='active'?'推定基礎代謝 '+round(e.base.bmr)+' kcal ＋ アクティブ消費 '+round(Number(draft.watchTotalKcal))+' kcal（概算・生活活動係数なし）':'スマートウォッチ総消費：'+round(e.total)+' kcal（入力値をそのまま採用）')+' / 運動の二重加算なし</p>':e.base?`<p>基礎代謝 ${round(e.base.bmr)} kcal / 日<br>生活活動係数 ×${e.base.activity}<br>参照体重 ${e.base.w.weight} kg（${e.base.w.date}）<br>年齢 ${e.base.age}歳<br>体重維持の推定値 ${e.total===null?'未算出':round(e.total)+' kcal / 日'}<br>減量参考値 ${round(e.base.life-Math.min(400,e.base.life*.15))} kcal / 日（生活消費から最大15%・400 kcalを差し引く概算）</p>`:'<p class="hint">成人プロフィールと過去または当日の体重記録が必要です。</p>';}
 function mascotAssessment(e,adjusted,rest=false){
- const count=e.food.count||{},hasFood=!!count.kcal;
- if(!hasFood)return {face:'🤖',grade:'記録待ち',title:'食事の記録を待っているよ！',advice:'食事を入力すると、目標とのバランスを見て一緒に振り返れるよ。'};
- const ratio=adjusted>0?e.food.total.kcal/adjusted:1;
- const hasP=count.p>0,protein=hasP?e.food.total.p/Math.max(1,Number(store.foodTargets?.p)||130):null;
- let score=65;
- if(ratio>=.8&&ratio<=1.12)score+=20;else if(ratio>=.65&&ratio<=1.25)score+=8;else score-=20;
- if(protein!==null)score+=protein>=.8&&protein<=1.5?12:protein>=.55?3:-8;
- if(e.food.complete)score+=5;
- if(e.balance!==null&&e.balance< -900)score-=15;
- if(rest)score+=3;
+ // 未入力と「食べなかった」は別。間食は任意で、朝昼夕の記録を待つ。
+ const required=['breakfast','lunch','dinner'];
+ const missing=required.filter(key=>{const m=draft.meals?.[key]||{};return !m.skipped&&!['kcal','p','f','c'].some(f=>C.nonnegative(m[f]));});
+ if(missing.length){
+  const names={breakfast:'朝食',lunch:'昼食',dinner:'夕食'};
+  return {face:'🤖',grade:'記録待ち',title:missing.length===3?'今日のごはんを記録してね！':'まだ食事の記録が途中だよ！',advice:'未記録：'+missing.map(k=>names[k]).join('・')+'。食べていない場合は「食べなかった」を選んでね。揃ったらカロリー収支を評価するよ。'};
+ }
+ if(e.balance===null)return {face:'🤖',grade:'記録待ち',title:'消費カロリーを確認しよう！',advice:'食事の記録は揃ったよ。体重・プロフィール・運動の入力を確認すると、収支を評価できるよ。'};
+ const g=C.goalAt(store,current),goalDaily=g&&Number.isFinite(Number(g.daily))?Number(g.daily):0;
+ const diff=e.balance-goalDaily;
+ const protein=e.food.count.p>0?e.food.total.p/Math.max(1,Number(store.foodTargets?.p)||130):null;
+ // 収支の目標との差を主軸にする。極端な赤字を高評価しない。
+ let score=Math.abs(diff)<=250?88:Math.abs(diff)<=450?78:Math.abs(diff)<=700?65:Math.abs(diff)<=1000?48:30;
+ if(protein!==null)score+=protein>=.8?7:protein>=.55?1:-5;
+ if(e.balance< -900)score-=22;
+ if(e.balance< -1300)score-=15;
+ // 食事が入力済みでも摂取が極端に少ない日は、赤字の大きさにかかわらず高評価にしない。
+ // BMRは推定値であり、ここでは診断ではなく記録確認を促す保守的な警告に用いる。
+ const intake=e.food.total.kcal;
+ const bmr=e.base?.bmr;
+ const intakeTooLow=intake===0||(Number.isFinite(bmr)&&bmr>0&&intake<bmr*.6);
+ if(intakeTooLow)score=Math.min(score,39);
+ if(rest)score+=intakeTooLow?0:2;
  const grade=score>=90?'満点':score>=75?'良い':score>=60?'並':score>=40?'良くない':'悪い';
  const faces={'満点':'🤖✨','良い':'🤖💚','並':'🤖','良くない':'🤖💭','悪い':'🤖🌧️'};
- let title='',advice='';
- if(ratio<.65){title='食事のエネルギーが少なめかも';advice='摂取目標との差が大きいよ。食事の記録漏れを確認して、必要なら主食やおかずを追加しよう。';}
- else if(ratio<.8){title='目標より少し少なめだよ';advice='無理に減らさず、空腹や疲れがあればご飯やタンパク質を補ってね。';}
- else if(ratio>1.25){title='今日は摂取目標を超えているよ';advice='一日だけで判断しなくて大丈夫。明日は極端に減らさず、いつもの食事に戻そう。';}
- else if(ratio>1.12){title='摂取目標より少し多めだね';advice='間食や飲み物を振り返ってみよう。無理な帳尻合わせは不要だよ。';}
- else if(protein!==null&&protein<.8){title='エネルギーはいい感じ！';advice='タンパク質が目標より少なめ。卵・魚・鶏肉・大豆製品などを一品足してみよう。';}
- else if(protein===null){title='摂取カロリーは目標に近いよ！';advice='PFCも記録すると、栄養バランスまで一緒に確認できるよ。';}
- else {title=grade==='満点'?'今日のバランス、いい感じ！':'目標に近づいているよ！';advice='摂取量とタンパク質のバランスは良好。体調に合わせて無理なく続けよう。';}
- if(!e.food.complete)advice+=' まだ入力途中なら、食事を記録してから最終確認してね。';
- if(rest&&ratio>=.65&&ratio<=1.25)advice+=' 休息日なら回復と睡眠も大切に。';
+ const amount=Math.round(Math.abs(e.balance));
+ const title=e.balance<0?'今日は'+amount+' kcalの消費超過だね':e.balance>0?'今日は'+amount+' kcalの摂取超過だね':'今日は摂取と消費がほぼ同じだね';
+ let advice=intakeTooLow?'摂取カロリーが極端に少ないようだよ。記録漏れがないか確認して、無理な食事制限は避けよう。':e.balance< -900?'赤字が大きめだよ。食事の記録漏れや体調を確認して、無理な制限は避けよう。':
+ '目標の収支（'+(goalDaily<0?'−':goalDaily>0?'+':'±')+Math.round(Math.abs(goalDaily))+' kcal）との差は約'+Math.round(Math.abs(diff))+' kcal。1日だけでなく週間の傾向も見ていこう。';
+ if(protein!==null&&protein<.8)advice+=' タンパク質も少し意識してね。';
+ if(rest)advice+=' 休息日は回復と睡眠も大切に。';
  return {face:faces[grade],grade,title,advice};
 }
 function renderMascot(e,adjusted){
@@ -94,12 +119,146 @@ function renderMascot(e,adjusted){
  const detail=document.createElement('span');detail.className='mascot-coach-advice';detail.textContent=m.advice;
  bubble.append(heading,detail);bubble.classList.remove('hidden');
 }
-function renderFood(){const totals=C.foodTotals(draft);$('foodDate').textContent=current;$('foodInputs').innerHTML='';for(const [key,name] of C.meals){const wrap=document.createElement('div');wrap.className='meal';const heading=document.createElement('h3');heading.textContent=name;wrap.append(heading);const skip=document.createElement('label');skip.className='check meal-skip';const skipInput=document.createElement('input');skipInput.type='checkbox';skipInput.checked=!!draft.meals?.[key]?.skipped;skipInput.onchange=()=>{draft.meals[key]={...(draft.meals[key]||{}),skipped:skipInput.checked};renderFood();renderEnergy()};skip.append(skipInput,'食べなかった');wrap.append(skip);const grid=document.createElement('div');grid.className='food-grid';if(skipInput.checked)grid.classList.add('meal-disabled');for(const [field,label] of [['kcal','kcal'],['p','P（g）'],['f','F（g）'],['c','C（g）']]){const inp=numberInput(label,draft.meals?.[key]?.[field],v=>{draft.meals[key]={...(draft.meals[key]||{}),[field]:v};renderFoodSummary()});inp.querySelector('input').id=`food_${key}_${field}`;inp.querySelector('input').disabled=skipInput.checked;grid.append(inp)}wrap.append(grid);$('foodInputs').append(wrap)}$('foodComplete').checked=!!draft.foodComplete;renderFoodSummary()}
+
+// AI food detail v1: extra optional meal property; existing scalar fields remain authoritative.
+const AI_FIELDS=['kcal','p','f','c'];
+function aiNum(v){return v===''||v===null||v===undefined?'':Number(v)}
+function aiSum(items){const out={};for(const f of AI_FIELDS){out[f]=items.every(it=>it[f]!==''&&it[f]!==null&&it[f]!==undefined)?String(Math.round(items.reduce((n,it)=>n+Number(it[f]),0)*10)/10):''}return out}
+function aiApplyTotals(key){const meal=draft.meals[key],t=aiSum(meal.aiItems||[]);for(const f of AI_FIELDS)meal[f]=t[f];meal.skipped=false;meal.aiStale=false;renderFood();renderEnergy();renderWeek()}
+function aiItemEditor(key,wrap){const meal=draft.meals[key]||{};if(!Array.isArray(meal.aiItems)||!meal.aiItems.length)return;const details=document.createElement('details');details.className='ai-item-details';const summary=document.createElement('summary');summary.textContent=`食品別内訳（${meal.aiItems.length}品）${meal.aiStale?' ⚠ 合計と未同期':''}`;details.append(summary);
+ meal.aiItems.forEach((it,index)=>{const box=document.createElement('div');box.className='ai-item';const name=textInput('食品名',it.name,v=>{it.name=v});box.append(name);const amount=textInput('分量',it.amount,v=>{it.amount=v});box.append(amount);const grid=document.createElement('div');grid.className='food-grid';for(const [f,label] of [['kcal','kcal'],['p','P (g)'],['f','F (g)'],['c','C (g)']]){const input=numberInput(label,it[f],v=>{it[f]=v;meal.aiStale=true;summary.textContent=`食品別内訳（${meal.aiItems.length}品） ⚠ 合計と未同期`});grid.append(input)}box.append(grid);box.append(textInput('根拠・不明点',it.note||'',v=>{it.note=v},true));const del=button('この食品を削除',()=>{if(!confirm('この食品を内訳から削除しますか？'))return;meal.aiItems.splice(index,1);meal.aiStale=true;renderFood()},'outline');box.append(del);details.append(box)});
+ const add=button('＋ 食品を追加',()=>{meal.aiItems.push({name:'新しい食品',amount:'',kcal:'',p:'',f:'',c:'',note:'要確認'});meal.aiStale=true;renderFood()},'outline');const apply=button('内訳から合計を再計算',()=>{if(!meal.aiItems.length){notice('食品がありません');return}aiApplyTotals(key)});details.append(add,apply);const note=document.createElement('p');note.className='hint';note.textContent='編集後は「内訳から合計を再計算」を押してください。未入力の栄養素は0にせず空欄になります。保存は別途必要です。';details.append(note);wrap.append(details)}
+function aiCopyRequest(){
+ const key=$('aiMealSelect').value,name=C.meals.find(x=>x[0]===key)?.[1]||'食事';
+ const description=$('aiDescription').value.trim();
+ const prompt=`あなたはChapi Fit用の食事栄養推定アシスタントです。以下の${name}（${current}）の食品別エネルギー（kcal）とP/F/C（各g）を推定し、ユーザーと確認してから取り込み用JSONを作ってください。
+
+【ユーザーの食事説明】
+${description||'文章での説明なし。添付写真がある場合は写真を参照してください。'}
+
+【写真の扱い】
+・この依頼文は写真を自動添付しません。ユーザーがこのAIアプリに添付した料理写真、商品パッケージ、栄養成分表示の写真を参照してください。写真がない場合は見たと主張しないでください。
+・栄養成分表示は「100g当たり」「1個当たり」「1食当たり」などの基準単位を読み取り、実際に食べた量に換算してください。ラベルが読めない数値は捏造せず、読めない箇所を明示してください。
+・ラベルの数値と食べた量は区別し、食べた量が不明なら確認してください。写真だけで重量を正確に測定できるとは主張しないでください。
+
+【推定の原則】
+1. ユーザーが伝えた実測量・摂取量・確定した栄養値と、判読できる商品ラベルを優先してください。食事写真による推定はその次です。数値の出典を区別してください。
+2. 不明な量は一般値や写真から妥当な仮定を置いて暫定推定してください。kcal/P/F/Cの4値をできるだけ出し、根拠と不確かさを説明してください。推定不能な値だけnullとし、nullと0を混同しないでください。
+3. 複合料理の栄養表示やユーザーの「料理全体で○kcal」がある場合は、その値に含まれる油・ソースを別計上しないでください。別計上が必要なものは衣や追加の調理油など実際に表示に含まれない部分に限り、二重計上を避けてください。
+4. 食材の誤認を避けてください。見た目だけで味噌汁の具や肉の部位を断定せず、疑わしいものは「推定」と明記してください。推定が積み重なり過大評価にならないよう料理全体の妥当性も確認してください。
+5. 食品ごとに「実測／商品ラベル／写真推定／一般値／仮定あり／不明」の根拠、量、加熱前後、皮の有無、衣・吸油などを簡潔に記録してください。
+
+【会話の進め方：重要】
+・最初の回答ではJSONを出さず、日本語の読みやすい一覧で食品ごとの推定量・kcal・P/F/Cと合計、根拠・仮定を示してください。
+・カロリーに大きく影響する不確かな点を優先して、確認事項を少数だけ質問してください。質問だけで回答を止めず、まず暫定推定を提示してください。
+・確認事項は必ず「【確認したいこと】」という見出しの下に、番号付き箇条書きで、質問の要点を太字にして目立たせてください。本文中に質問を埋もれさせないでください。汁物・煮物など具材が見分けにくい料理は、具材を確認する質問も候補にしてください。
+・ユーザーの訂正を受けたら再計算して変更点を説明し、確認を求めてください。ユーザーが「OK」「確定」「JSONを出して」などと伝えたら最終JSONを発行してください。ユーザーが確認を省略してJSONを希望した場合も発行してください。
+・説明も写真もなく食品を特定できない場合は食品を創作せず、情報提供を依頼してください。
+
+【最終JSONの形式】
+確認後の最終回答は、前置きなしで次の形式のJSONコードブロック1つだけにしてください。余分なキーや合計行は付けないでください。食品ごとに1要素、数値は非負のJSON数値（文字列ではない）とし、極端な小数精度を避けてください。
+{ "format":"chapi-food-v1", "items":[{"name":"食品名","amount":"200g（推定）","kcal":200,"p":4,"f":1,"c":45,"note":"根拠：一般値・仮定あり。量は200gと仮定。"}] }
+数値が不明な場合のみnullを使い、食品が特定できない場合はJSON発行前に食事情報を確認してください。`; 
+ copy(prompt);
+}
+function aiParse(text){if(text.length>50000)throw Error('テキストが長すぎます（5万文字以内）');const blocks=[...text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)].map(m=>m[1].trim());let data=null;for(const t of [...blocks,text.trim()]){try{const parsed=JSON.parse(t);if(parsed?.format==='chapi-food-v1'){data=parsed;break}}catch(e){}}if(!data)throw Error('chapi-food-v1形式のJSONが見つかりません');if(!Array.isArray(data.items)||!data.items.length||data.items.length>40)throw Error('食品は1〜40件にしてください');return data.items.map(it=>{if(!it||typeof it!=='object'||typeof it.name!=='string'||!it.name.trim()||it.name.length>120)throw Error('食品名が不正です');const item={name:it.name.trim(),amount:String(it.amount??'').slice(0,100),note:String(it.note??'').slice(0,500)};for(const f of AI_FIELDS){const v=it[f];if(v===null||v===''||v===undefined){item[f]='';continue}if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>10000)throw Error(`${it.name}の${f}が不正です`);item[f]=String(v)}return item})}
+let aiPending=null;
+function aiPreview(){
+ try{
+  aiPending=aiParse($('aiResult').value);
+  const sum=aiSum(aiPending),root=$('aiPreview');root.replaceChildren();
+  const title=document.createElement('h3');title.textContent=`取り込み内容を確認（${aiPending.length}品）`;root.append(title);
+  const total=document.createElement('section');total.className='ai-preview-total';
+  const label=document.createElement('div');label.className='ai-preview-caption';label.textContent='合計カロリー';
+  const energy=document.createElement('strong');energy.className='ai-preview-energy';energy.textContent=`${sum.kcal===''?'未算出':sum.kcal} kcal`;
+  const macros=document.createElement('div');macros.className='ai-preview-macros';
+  for(const [f,name] of [['p','P'],['f','F'],['c','C']]){const cell=document.createElement('span');cell.textContent=`${name} ${sum[f]===''?'未算出':sum[f]+'g'}`;macros.append(cell)}
+  total.append(label,energy,macros);root.append(total);
+  const list=document.createElement('div');list.className='ai-preview-list';
+  for(const it of aiPending){
+   const card=document.createElement('section');card.className='ai-preview-card';
+   const heading=document.createElement('div');heading.className='ai-preview-heading';
+   const food=document.createElement('div');const name=document.createElement('strong');name.textContent=it.name;const amount=document.createElement('small');amount.textContent=it.amount||'分量未入力';food.append(name,amount);
+   const kcal=document.createElement('strong');kcal.className='ai-preview-kcal';kcal.textContent=`${it.kcal===''?'未入力':it.kcal} kcal`;
+   heading.append(food,kcal);
+   const macros=document.createElement('div');macros.className='ai-preview-macros';for(const [f,n] of [['p','P'],['f','F'],['c','C']]){const span=document.createElement('span');span.textContent=`${n} ${it[f]===''?'未入力':it[f]+'g'}`;macros.append(span)}
+   const details=document.createElement('details');details.className='ai-preview-note';const summary=document.createElement('summary');summary.textContent='推定根拠・不明点を見る';const note=document.createElement('p');note.textContent=it.note||'根拠の記載なし';details.append(summary,note);
+   card.append(heading,macros,details);list.append(card);
+  }
+  root.append(list);
+  const warning=document.createElement('p');warning.className='warning';warning.textContent='⚠ AI推定値です。分量・調理油・食品ラベル等の根拠を確認してください。空欄の栄養素は0ではありません。';root.append(warning);
+  $('aiAccept').disabled=false;$('aiAcceptTop').disabled=false;
+ }catch(e){aiPending=null;$('aiAccept').disabled=true;$('aiAcceptTop').disabled=true;$('aiPreview').textContent='取り込み不可：'+e.message}
+}
+function aiAccept(){
+ if(!aiPending){notice('先に取り込み内容を確認してください');return}
+ const key=$('aiMealSelect').value,name=C.meals.find(x=>x[0]===key)?.[1]||key,meal=draft.meals[key]||{};
+ if((meal.skipped||AI_FIELDS.some(f=>C.nonnegative(meal[f]))||meal.aiItems?.length)&&!confirm(`${current}の${name}の数値と内訳を置き換えます。備考は保持します。よろしいですか？`))return;
+ const previous=C.clone(meal);
+ draft.meals[key]={...meal,aiItems:C.clone(aiPending),aiSource:'AI推定・要確認'};
+ const t=aiSum(draft.meals[key].aiItems);for(const f of AI_FIELDS)draft.meals[key][f]=t[f];draft.meals[key].skipped=false;draft.meals[key].aiStale=false;
+ if(!saveOneMeal(key)){draft.meals[key]=previous;notice('保存に失敗したため取り込みを確定していません。JSONは保持しています。');return}
+ aiDiscard();$('aiPreview').textContent=name+'に反映して保存しました ✓';renderFood();renderEnergy();renderWeek();
+}
+
+function renderFood(){const totals=C.foodTotals(draft);$('foodDate').textContent=current;$('foodInputs').innerHTML='';for(const [key,name] of C.meals){const wrap=document.createElement('div');wrap.className='meal meal-section';const head=document.createElement('div');head.className='meal-head';const heading=document.createElement('h3');heading.textContent=name;head.append(heading);const skip=document.createElement('label');skip.className='check meal-skip';const skipInput=document.createElement('input');skipInput.type='checkbox';skipInput.checked=!!draft.meals?.[key]?.skipped;skipInput.onchange=()=>{draft.meals[key]={...(draft.meals[key]||{}),skipped:skipInput.checked};renderFood();renderEnergy()};skip.append(skipInput,'食べなかった');head.append(skip);const mealSave=button('保存',()=>saveOneMeal(key),'meal-save');head.append(mealSave);wrap.append(head);const grid=document.createElement('div');grid.className='food-grid';if(skipInput.checked)grid.classList.add('meal-disabled');for(const [field,label] of [['kcal','kcal'],['p','P（g）'],['f','F（g）'],['c','C（g）']]){const inp=numberInput(label,draft.meals?.[key]?.[field],v=>{draft.meals[key]={...(draft.meals[key]||{}),[field]:v,aiStale:Array.isArray(draft.meals[key]?.aiItems)&&draft.meals[key].aiItems.length>0?true:draft.meals[key]?.aiStale};renderFoodSummary()});inp.querySelector('input').id=`food_${key}_${field}`;inp.querySelector('input').disabled=skipInput.checked;grid.append(inp)}wrap.append(grid);const noteField=textInput('備考（任意）',draft.meals?.[key]?.note||'',v=>{draft.meals[key]={...(draft.meals[key]||{}),note:v}},true);noteField.classList.add('meal-note');noteField.querySelector('textarea').id=`food_${key}_note`;noteField.querySelector('textarea').placeholder='料理名・量・食事の状況など';wrap.append(noteField);aiItemEditor(key,wrap);$('foodInputs').append(wrap)}$('foodComplete').checked=!!draft.foodComplete;renderFoodSummary()}
 function renderFoodSummary(){const t=C.foodTotals(draft),targets=store.foodTargets||{},root=$('foodSummary');root.innerHTML='';for(const [f,label,unit] of [['kcal','摂取カロリー','kcal'],['p','タンパク質 P','g'],['f','脂質 F','g'],['c','炭水化物 C','g']]){const box=document.createElement('div');box.className='food-stat';const target=Number(targets[f]);box.innerHTML=`<span class="label">${label}</span><strong>${t.count[f]?round(t.total[f],1)+' <small>'+unit+'</small>':'未記録'}</strong><progress max="100" value="${target?Math.min(100,t.total[f]/target*100):0}"></progress><small>目標 ${Number.isFinite(target)?round(target,1)+' '+unit:'未設定'}${Number.isFinite(target)?'<br>残り '+round(target-t.total[f],1)+' '+unit:''}</small>`;root.append(box)}}
-function dayReport(day,d){const e=C.energy(store,day,d),lines=[`【Chapi Fit ${day}】`,`体重：${C.numeric(d.weight)?d.weight+' kg':'未入力'}`,`摂取カロリー：${e.food.count.kcal?round(e.food.total.kcal)+' kcal':'未記録'}`,`推定総消費カロリー：${e.total===null?'未算出':round(e.total)+' kcal'}`,`カロリー収支：${e.balance===null?'未算出':signed(e.balance)+' kcal'}${e.provisional?'（暫定）':''}`];if(d.strengthWorkout){const w=d.strengthWorkout;lines.push('\n💪 筋トレ全体');if(C.numeric(w.minutes))lines.push('合計時間 '+w.minutes+' 分');if(C.numeric(w.kcal))lines.push('入力消費 '+w.kcal+' kcal（'+({net:'正味',gross:'総消費',unknown:'区分未確認'}[w.energyType||'unknown'])+'）')}for(const sess of d.sessions||[])for(const i of sess.items||[]){lines.push('\n'+(i.kind==='cardio'?'🏃 ':'💪 ')+i.name);if(i.rounds!==undefined)lines.push('周回数 '+(i.rounds||'未入力')+' 周');for(const [n,st] of (i.sets||[]).entries())lines.push(`${n+1}セット：${st.kg??'—'} kg × ${st.reps||'—'} 回 / RIR ${st.rir??'—'}${st.done?' ✓':''}`);if(i.kind==='cardio'&&C.numeric(i.minutes))lines.push('時間 '+i.minutes+' 分');if(C.numeric(i.km))lines.push('距離 '+i.km+' km');if(i.kind==='cardio'&&C.numeric(i.kcal))lines.push('入力消費 '+i.kcal+' kcal（'+({net:'正味',gross:'総消費',unknown:'区分未確認'}[i.energyType||'unknown'])+'）');if(i.note)lines.push('備考：'+i.note)}lines.push('\n'+foodReport(d));if(C.numeric(d.calories))lines.push('旧活動カロリー（保持・合計対象外）：'+d.calories+' kcal');if(d.restDay)lines.push('🌙 休息日');if(d.note)lines.push('メモ：'+d.note);return lines.join('\n')}
-function foodReport(d){const lines=[];for(const [key,name] of C.meals){const m=d.meals?.[key]||{};if(m.skipped){lines.push(`${name}：食べなかった（0 kcal / P 0 g / F 0 g / C 0 g）`)}else if(['kcal','p','f','c'].some(f=>C.numeric(m[f])))lines.push(`${name}：${C.numeric(m.kcal)?m.kcal:'—'} kcal / P ${C.numeric(m.p)?m.p:'—'} g / F ${C.numeric(m.f)?m.f:'—'} g / C ${C.numeric(m.c)?m.c:'—'} g`)}const t=C.foodTotals(d);lines.push(`入力合計：${round(t.total.kcal)} kcal / P ${round(t.total.p,1)} g / F ${round(t.total.f,1)} g / C ${round(t.total.c,1)} g`);return lines.join('\n')}
+function dayReport(day,d){
+ // An untouched, unsaved draft is not a recorded day. Keep saved records even if empty.
+ const hasDraftRecord=!!(d&&(
+  C.numeric(d.weight)||String(d.note||'').trim()||d.restDay===true||
+  (d.sessions||[]).length>0||d.strengthWorkout&&Object.values(d.strengthWorkout).some(v=>v!==''&&v!==null&&v!==undefined)||
+  d.watchEnabled===true||C.nonnegative(d.watchTotalKcal)||d.foodComplete===true||
+  Object.values(d.meals||{}).some(m=>m&&(m.skipped===true||String(m.note||'').trim()||['kcal','p','f','c'].some(f=>C.nonnegative(m[f]))))
+ ));
+ const reportDays={...store.days};
+ if(hasDraftRecord||Object.prototype.hasOwnProperty.call(store.days,day))reportDays[day]=d;
+ const reportStore={...store,days:reportDays};
+ const e=C.energy(reportStore,day,d),g=C.goalAt(reportStore,day),w=C.week(reportStore,day,today()),targets=store.foodTargets||{};
+ const required=C.meals.filter(([key])=>key!=='snack');
+ const missing=required.filter(([key])=>{const m=d.meals?.[key]||{};return !m.skipped&&!C.nonnegative(m.kcal)}).map(([,name])=>name);
+ const elapsedWeekDays=w.dates.filter(date=>date<=today());
+ const weekMissing=elapsedWeekDays.filter(date=>!reportStore.days[date]);
+ const weekIncomplete=elapsedWeekDays.filter(date=>reportStore.days[date]&&w.values.find(v=>v.date===date)?.balance===null);
+ const weekPartial=elapsedWeekDays.filter(date=>reportStore.days[date]&&w.values.find(v=>v.date===date)?.balance!==null&&w.values.find(v=>v.date===date)?.provisional);
+ const weekProvisional=weekMissing.length>0||weekIncomplete.length>0||weekPartial.length>0;
+ // AI report compares only days with calculable balances; never compare 5 days against a 7-day target.
+ const reportWeekTarget=w.fullTarget===null?null:w.fullTarget*w.count/7;
+ const reportWeekDiff=reportWeekTarget===null||w.count===0?null:w.sum-reportWeekTarget;
+ const weekAllDaysCalculated=w.count===7;
+ const weekStatus=`週間記録状況：経過${elapsedWeekDays.length}日中、収支算出${w.count}日（確定${w.complete}日・暫定${weekPartial.length}日）、未記録${weekMissing.length}日、収支未算出${weekIncomplete.length}日。未来日は判定対象外。`;
+ const weekMissingDetail=`未記録日：${weekMissing.length?weekMissing.join('、'):'なし'}（収支0 kcalとはみなさず集計対象外）`;
+ const weekIncompleteDetail=`記録あり・収支未算出日：${weekIncomplete.length?weekIncomplete.join('、'):'なし'}（集計対象外）`;
+ const weekPartialDetail=`暫定収支の日：${weekPartial.length?weekPartial.join('、'):'なし'}（算出済み合計に含むが不完全な記録）`;
+ const lines=[
+  `【Chapi Fit AI相談用レポート ${day}】`,
+  'このテキストはChapi Fitの記録です。食事・運動・体重・目標を踏まえて、健康と継続性を重視して助言してください。未入力を0として扱わず、推定消費や暫定収支には誤差があることを考慮してください。',
+  `体重：${C.numeric(d.weight)?d.weight+' kg':'未入力'}${e.base?.w&&(!C.numeric(d.weight)||Number(d.weight)<=0)?'（消費計算の参照体重 '+e.base.w.weight+' kg／'+e.base.w.date+'）':''}`,
+  `目標体重：${g?g.target+' kg（開始 '+g.start+'、期限 '+g.end+'）':'未設定'}`,
+  `体重目標に基づく参考収支：${g?signed(Math.round(g.daily))+' kcal/日':'未設定'}`,
+  `食事の設定目標：${C.numeric(targets.kcal)?round(targets.kcal)+' kcal':'未設定'} / P ${C.numeric(targets.p)?round(targets.p,1)+' g':'未設定'} / F ${C.numeric(targets.f)?round(targets.f,1)+' g':'未設定'} / C ${C.numeric(targets.c)?round(targets.c,1)+' g':'未設定'}`,
+  `食事記録：${missing.length?'入力途中（未記録：'+missing.join('・')+'）':'朝昼夕は記録済み'}`,
+  `摂取カロリー：${e.food.count.kcal?round(e.food.total.kcal)+' kcal'+(missing.length?'（入力済み分のみ・暫定）':''):'未記録'}`,
+  `推定総消費カロリー：${e.total===null?'未算出':round(e.total)+' kcal'}`,
+  `消費計算の方式：${e.watch?(e.watchMode==='active'?'Watchアクティブ消費＋推定BMR（運動の二重加算なし）':'Watch総消費をそのまま使用（運動の二重加算なし）'):d.watchEnabled&&d.watchMode==='active'&&C.numeric(d.watchTotalKcal)&&Number(d.watchTotalKcal)>0&&!e.base?(e.total===null?'Watchアクティブ消費を入力済みだがBMR不足のため総消費未算出':'Watchアクティブ消費を入力済みだがBMR不足のため従来推定へ切替'):d.watchEnabled?(e.total===null?'Watch入力は計算に使用できず総消費未算出':'Watch入力は計算に使用できず従来推定へ切替'):'生活活動による推定＋登録済みの正味運動消費（未確認の運動は加算しない）'}`,
+  `カロリー収支：${e.balance===null?'未算出':signed(e.balance)+' kcal'}${e.provisional||missing.length?'（暫定）':''}`,
+  weekStatus,
+  weekMissingDetail,
+  weekIncompleteDetail,
+  weekPartialDetail,
+  `週間収支（${w.start}〜${w.end}）：${w.count?signed(w.sum)+' kcal（'+(weekAllDaysCalculated?'7日間全体'+(weekProvisional?'・暫定値を含む':'・確定'):'算出済み'+w.count+'日分のみ。7日間全体の収支ではない')+'）':'未算出'}${weekProvisional?'（記録不足・暫定）':''}`,
+  `週間目標（収支算出${w.count}日分との比較用）：${reportWeekTarget===null?'未設定':signed(Math.round(reportWeekTarget))+' kcal（7日目標を算出日数で按分）'} / 実績−目標：${reportWeekDiff===null?'未算出':signed(Math.round(w.sum)-Math.round(reportWeekTarget))+' kcal（プラスは目標より収支が高い）'}${weekProvisional?'（暫定）':''}`,
+  `週間運動目標：${g&&C.numeric(g.exerciseWeeklyKcal)?round(g.exerciseWeeklyKcal)+' kcal':'未設定'}`,
+  '飲酒：未記録（飲酒なしとは判定しない）'
+ ];
+ if(d.watchEnabled)lines.push(`Watch入力：${C.numeric(d.watchTotalKcal)?d.watchTotalKcal+' kcal':'未入力'}（${d.watchMode==='active'?'アクティブ':'総消費'}）`);
+ if(d.strengthWorkout){const v=d.strengthWorkout;lines.push('\n💪 筋トレ全体');if(C.numeric(v.minutes))lines.push('合計時間 '+v.minutes+' 分');if(C.numeric(v.kcal))lines.push('入力消費 '+v.kcal+' kcal（'+({net:'正味',gross:'総消費',unknown:'区分未確認'}[v.energyType||'unknown'])+'）')}
+ for(const sess of d.sessions||[])for(const i of sess.items||[]){lines.push('\n'+(i.kind==='cardio'?'🏃 ':'💪 ')+i.name);if(i.rounds!==undefined)lines.push('周回数 '+(i.rounds||'未入力')+' 周');for(const [n,st] of (i.sets||[]).entries())lines.push(`${n+1}セット：${st.kg??'—'} kg × ${st.reps||'—'} 回 / RIR ${st.rir??'—'}${st.done?' ✓':''}`);if(i.kind==='cardio'&&C.numeric(i.minutes))lines.push('時間 '+i.minutes+' 分');if(C.numeric(i.km))lines.push('距離 '+i.km+' km');if(i.kind==='cardio'&&C.numeric(i.kcal))lines.push('入力消費 '+i.kcal+' kcal（'+({net:'正味',gross:'総消費',unknown:'区分未確認'}[i.energyType||'unknown'])+'）');if(i.note)lines.push('備考：'+i.note)}
+ lines.push('\n🍽️ 食事',foodReport(d));if(C.numeric(d.calories))lines.push('旧活動カロリー（保持・合計対象外）：'+d.calories+' kcal');if(d.restDay)lines.push('🌙 休息日（本人の指定。運動記録もある場合は併記）');if(d.note)lines.push('メモ：'+d.note);return lines.join('\n')
+}
+function foodReport(d){const lines=[];for(const [key,name] of C.meals){const m=d.meals?.[key]||{};if(m.skipped){lines.push(`${name}：食べなかった（0 kcal / P 0 g / F 0 g / C 0 g）`)}else if(['kcal','p','f','c'].some(f=>C.nonnegative(m[f])))lines.push(`${name}：${C.nonnegative(m.kcal)?m.kcal:'未入力'} kcal / P ${C.nonnegative(m.p)?m.p:'未入力'} g / F ${C.nonnegative(m.f)?m.f:'未入力'} g / C ${C.nonnegative(m.c)?m.c:'未入力'} g`);else lines.push(`${name}：未記録`);if(m.note)lines.push(`${name}の備考：${m.note}`);if(Array.isArray(m.aiItems)&&m.aiItems.length){lines.push(`${name}の食品別内訳（AI推定・要確認${m.aiStale?'・合計未同期':''}）：`);for(const it of m.aiItems)lines.push(`・${it.name} ${it.amount||''}：${it.kcal===''?'未入力':it.kcal} kcal / P ${it.p===''?'未入力':it.p} g / F ${it.f===''?'未入力':it.f} g / C ${it.c===''?'未入力':it.c} g（${it.note||'根拠未記載'}）`)}}const t=C.foodTotals(d);lines.push(`入力済み合計：${t.count.kcal?round(t.total.kcal):'未算出'} kcal / P ${t.count.p?round(t.total.p,1):'未算出'} g / F ${t.count.f?round(t.total.f,1):'未算出'} g / C ${t.count.c?round(t.total.c,1):'未算出'} g`);const incomplete=C.meals.filter(([key])=>{const m=d.meals?.[key]||{};return !m.skipped&&C.nonnegative(m.kcal)&&['p','f','c'].some(f=>!C.nonnegative(m[f]))}).map(([,name])=>name);if(incomplete.length)lines.push(`PFC注意：${incomplete.join('・')}のPFCに未入力があります。上記PFCは入力済み分の小計であり、1日全体の合計ではありません。`);return lines.join('\n')}
 async function copy(text){try{await navigator.clipboard.writeText(text);notice('コピーしました')}catch(e){const a=document.createElement('textarea');a.value=text;document.body.append(a);a.select();try{if(!document.execCommand('copy'))throw Error();notice('コピーしました')}catch(e){prompt('コピーする内容',text)}a.remove()}}
-function renderWeek(){const w=C.week(store,current,today());$('weekHeading').textContent=(C.weekStart(current)===C.weekStart(today())?'今週':'選択した週')+'のカロリー収支目標';$('weekDates').textContent=w.start+' 〜 '+w.end+'（月〜日・保存済み記録）';$('weekTarget').textContent=w.target===null?'体重目標を設定してください':signed(Math.round(w.target))+' kcal（集計対象 '+(7-w.excludedPast)+'/7日）';$('weekSummary').innerHTML=`<p>記録済み累計 <b class="${color(w.sum)}">${w.count?signed(w.sum)+' kcal':'未算出'}</b>（${w.count}/7日）</p>${w.target!==null?'<p>目標との差 '+signed(w.left)+' kcal'+(w.rate===null?' ／ 維持目標のため達成率は表示しません':' ／ 達成率 '+round(w.rate,1)+'%')+'</p>':''}`;renderWeekBars(w);$('weekDaily').textContent=(w.excludedPast?`過去の未記録 ${w.excludedPast}日分を週間目標から除外。今日と未来の日は未入力でも目標に含みます。 `:'')+(w.perDay===null?'':`残り${w.remaining}日（当日を含む）の参考収支：${signed(Math.round(w.perDay))} kcal / 日。今日の記録も入力途中なら暫定です。`);const g=C.goalAt(store,current),base=C.baseEnergy(store,current),plan=g&&base?C.exercisePlan(g,base.life):null;
+function renderWeek(){const w=C.week(store,current,today());$('weekHeading').textContent=(C.weekStart(current)===C.weekStart(today())?'今週':'選択した週')+'のカロリー収支目標';$('weekDates').textContent=w.start+' 〜 '+w.end+'（日〜土・保存済み記録）';$('weekTarget').textContent=w.target===null?'体重目標を設定してください':signed(Math.round(w.target))+' kcal（集計対象 '+(7-w.excludedPast)+'/7日）';$('weekSummary').innerHTML=`<p>記録済み累計 <b class="${color(w.sum)}">${w.count?signed(w.sum)+' kcal':'未算出'}</b>（${w.count}/7日）</p>${w.target!==null?'<p>実績−目標 '+signed(Math.round(w.sum)-Math.round(w.target))+' kcal（プラスは目標より収支が高い）'+(w.rate===null?' ／ 維持目標のため達成率は表示しません':' ／ 達成率 '+round(w.rate,1)+'%')+'</p>':''}`;renderWeekBars(w);$('weekDaily').textContent=(w.excludedPast?`過去の未記録 ${w.excludedPast}日分を週間目標から除外。今日と未来の日は未入力でも目標に含みます。 `:'')+(w.perDay===null?'':`残り${w.remaining}日（当日を含む）の参考収支：${signed(Math.round(w.perDay))} kcal / 日。今日の記録も入力途中なら暫定です。`);const g=C.goalAt(store,current),base=C.baseEnergy(store,current),plan=g&&base?C.exercisePlan(g,base.life):null;
 const allowance=$('weekIntakeAllowance');
 if(allowance){
  const eligible=w.perDay!==null&&w.remaining>0&&base&&Number.isFinite(base.life);
@@ -115,7 +274,7 @@ if(allowance){
 $('weekExercisePlan').innerHTML=plan?`<b>今週の運動・食事プラン</b><p>週間運動消費目標：${round(plan.exerciseWeekly)} kcal / 週 <small>（1日平均 ${round(plan.exerciseDaily)} kcal）</small><br>食事で確保するカロリー収支の目安：${signed(plan.foodWeekly)} kcal / 週 <small>（1日平均 ${signed(plan.foodDaily)} kcal）</small><br>運動計画を70％反映した摂取カロリー参考値：${round(plan.intakeDaily)} kcal / 日</p><p class="hint">計画値は実際のカロリー収支には加算しません。食事目標へ反映する場合は設定から手動で適用してください。</p>`:'<p class="hint">運動計画を確認するには体重目標とプロフィールを設定してください。</p>';
 const weekExercise=w.dates.filter(day=>day<=today()&&store.days[day]).reduce((sum,day)=>{const v=C.energy(store,day);return sum+v.exercise.net},0);const exerciseGoal=Number(g?.exerciseWeeklyKcal)||0;$('weeklyExerciseSummary').innerHTML=`<b>🏃 今週の運動：${round(weekExercise)} / ${round(exerciseGoal)} kcal</b><progress max="100" value="${exerciseGoal?Math.min(100,weekExercise/exerciseGoal*100):0}"></progress><small>${exerciseGoal?'目標達成率 '+round(weekExercise/exerciseGoal*100,1)+'%':'運動目標は設定から登録できます'} ／ 保存済みの記録のみ集計</small>`;$('weekWarning').textContent=(w.complete<7?'入力不足があるため実績・進捗は暫定です。未記録日は0としていません。 ':'')+(w.perDay!==null&&Math.abs(w.perDay)>750?'日割り値が大きいため、無理な帳尻合わせはせず期間を見直してください。':'収支の符号だけで健康上の良否は判断できません。')}
 function renderWeekBars(w){
- const root=$('weekBars'),days=['月','火','水','木','金','土','日'];
+ const root=$('weekBars'),days=['日','月','火','水','木','金','土'];
  const max=Math.max(500,...w.values.filter(v=>v.balance!==null).map(v=>Math.abs(v.balance)));
  root.innerHTML=w.values.map((v,i)=>{
   const missing=v.balance===null,amount=missing?0:Math.abs(v.balance),pct=Math.min(100,amount/max*100);
@@ -123,7 +282,7 @@ function renderWeekBars(w){
   return `<div class="week-row"><span class="week-day">${days[i]}</span><div class="week-axis"><div class="week-half left">${v.balance<0?bar:''}</div><div class="week-half right">${v.balance>=0&&!missing?bar:''}</div></div><span class="week-amount ${missing?'muted':color(v.balance)}">${missing?'未入力':signed(Math.round(v.balance))+' kcal'}</span></div>`
  }).join('');
 }
-function marks(d){const items=(d?.sessions||[]).flatMap(s=>s.items||[]);const strength=items.some(i=>i.kind!=='cardio'&&(i.done||Number(i.rounds)>0||(i.sets||[]).some(s=>s.done||C.numeric(s.reps)))),cardio=items.some(i=>i.kind==='cardio'&&(Number(i.minutes)>0||Number(i.km)>0||Number(i.steps)>0||Number(i.kcal)>0));return (strength?'💪':'')+(cardio?'🏃':'')+(C.foodTotals(d||{}).hasMark?'🍽️':'')}
+function marks(d){const items=(d?.sessions||[]).flatMap(s=>s.items||[]);const strength=items.some(i=>i.kind!=='cardio'&&(i.done||Number(i.rounds)>0||(i.sets||[]).some(s=>s.done||C.numeric(s.reps)))),cardio=items.some(i=>i.kind==='cardio'&&(Number(i.minutes)>0||Number(i.km)>0||Number(i.steps)>0||Number(i.kcal)>0));return (strength?'💪':'')+(cardio?'🏃‍♀️':'')+(d?.restDay?'🌙':'')+(C.foodTotals(d||{}).hasMark?'🍽️':'')}
 function renderCalendar(){const root=$('calendarGrid');root.innerHTML='';const dt=C.date(month),year=dt.getFullYear(),m=dt.getMonth();$('calendarMonth').textContent=`${year}年${m+1}月`;for(const day of ['日','月','火','水','木','金','土']){const e=document.createElement('div');e.className='weekday';e.textContent=day;root.append(e)}for(let n=0;n<dt.getDay();n++)root.append(document.createElement('div'));const len=new Date(year,m+1,0).getDate();for(let n=1;n<=len;n++){const day=C.iso(new Date(year,m,n)),d=store.days[day],e=d?C.energy(store,day):null,b=button('',()=>{selectedDetail=day;renderCalendarDetail(day);renderCalendarSelection()},'');b.dataset.day=day;b.setAttribute('aria-label',day+' '+(e?.balance!=null?'カロリー収支 '+signed(e.balance)+' kcal':'収支未算出'));b.innerHTML=`<span class="day-num">${n}</span><span class="marks">${marks(d)||'　'}</span><span class="day-energy ${color(e?.balance??null)}">${e?.balance!=null?signed(e.balance)+(e.provisional?'*':''):'—'}</span><span class="unit">${e?.balance!=null?'kcal':''}</span>`;if(day===today())b.classList.add('today');root.append(b)}renderCalendarSelection();renderCalendarDetail(selectedDetail);renderMonthlyBalance()}
 function renderMonthlyBalance(){
  const root=$('monthlyBalanceSummary'),ym=month.slice(0,7),now=today();
@@ -182,9 +341,9 @@ function renderBalanceGraph(){
  const period=$('balancePeriod').value,days=period==='week'?7:Number(period),end=period==='week'?C.plusDays(C.weekStart(graphWeek),6):graphWeek,start=C.plusDays(end,1-days),now=today();
  const dates=Array.from({length:days},(_,i)=>C.plusDays(start,i));
  const values=dates.map(date=>{if(date>now||!store.days[date])return {date,balance:null};const e=C.energy(store,date);return {date,balance:e.balance,provisional:e.provisional}});
- const svg=chartBase(days+'日間のカロリー収支。マイナスは緑、プラスは赤。未記録日は描画しません。');
+ const svg=chartBase(days+'日間のカロリー収支。マイナスは青、プラスは赤。未記録日は描画しません。');
  $('graphWeekLabel').textContent=start.slice(5)+'〜'+end.slice(5);
- const nums=values.filter(p=>p.balance!==null).map(p=>p.balance),max=Math.max(500,...nums.map(Math.abs)),zero=145,y=v=>zero-v/max*105;
+ const nums=values.filter(p=>p.balance!==null).map(p=>p.balance),peak=Math.max(0,...nums.map(Math.abs)),max=Math.max(500,Math.ceil((peak+100)/100)*100),zero=145,y=v=>zero-v/max*99;
  for(const v of [-max,0,max])svg.append(svgEl('line',{x1:56,x2:630,y1:y(v),y2:y(v),stroke:v===0?'#899b87':'#dde4d5'}),svgEl('text',{x:48,y:y(v)+4,'text-anchor':'end'},round(v)));
  svg.append(svgEl('text',{x:8,y:20},'kcal'));
  const width=560/days,barWidth=Math.max(2,width*(days===7?.7:.78)),left=60;
@@ -192,9 +351,9 @@ function renderBalanceGraph(){
   const center=left+(i+.5)*width;
   if(days===7||i===0||i===days-1||i%Math.max(1,Math.ceil(days/6))===0)svg.append(svgEl('text',{x:center,y:277,'text-anchor':'middle','font-size':days===7?13:10},days===7?['月','火','水','木','金','土','日'][i]:p.date.slice(5)));
   if(p.balance===null){if(days===7)svg.append(svgEl('text',{x:center,y:165,'text-anchor':'middle','font-size':11},'未算出'));return}
-  const rect=svgEl('rect',{x:center-barWidth/2,y:Math.min(zero,y(p.balance)),width:barWidth,height:Math.max(3,Math.abs(zero-y(p.balance))),rx:days===7?4:1,fill:p.balance<0?'#568565':p.balance>0?'#b85164':'#889581'});
+  const rect=svgEl('rect',{x:center-barWidth/2,y:Math.min(zero,y(p.balance)),width:barWidth,height:Math.max(3,Math.abs(zero-y(p.balance))),rx:days===7?4:1,fill:p.balance<0?'#2478bf':p.balance>0?'#bc4554':'#889581'});
   tapMark(rect,p.date+'：カロリー収支 '+signed(p.balance)+' kcal'+(p.provisional?'（暫定）':''));svg.append(rect);
-  if(days===7)svg.append(svgEl('text',{x:center,y:p.balance<0?Math.min(263,y(p.balance)+15):Math.max(28,y(p.balance)-7),'text-anchor':'middle','font-size':11,'font-weight':'700',fill:p.balance<0?'#376f56':p.balance>0?'#a34557':'#596b61'},signed(Math.round(p.balance))));
+  if(days===7)svg.append(svgEl('text',{x:center,y:p.balance<0?Math.min(258,y(p.balance)+17):Math.max(26,y(p.balance)-10),'text-anchor':'middle','font-size':11,'font-weight':'700',fill:p.balance<0?'#2478bf':p.balance>0?'#bc4554':'#596b61'},signed(Math.round(p.balance))));
  });
  svg.onclick=evt=>{if(evt.target.closest('rect.hit'))return;const pos=(evt.clientX-svg.getBoundingClientRect().left)/svg.getBoundingClientRect().width*640;const i=Math.max(0,Math.min(days-1,Math.floor((pos-left)/width))),p=values[i];$('graphDetail').textContent=p.date+'：'+(p.balance===null?'未算出（未記録を含む）':'カロリー収支 '+signed(p.balance)+' kcal'+(p.provisional?'（暫定）':''))};
  const count=nums.length,sum=nums.reduce((a,b)=>a+b,0);
@@ -243,7 +402,7 @@ function refreshMacroNumbers(){for(const k of C.keys){const v=targetsDraft.mode=
 for(const [id,key,name] of [['exportRestore',RESTORE,'before-restore'],['exportDeleted','chapi-training-before-delete','before-delete']])$(id).onclick=()=>{const raw=localStorage.getItem(key);if(!raw){notice('該当するコピーはありません');return}download({app:'chapi-training',version:2,store:JSON.parse(raw)},'chapi-fit-'+name+'.json')};
 
 // Bind fixed controls.
-document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));$('openSettings').onclick=()=>switchTab('settings');$('recordDate').onchange=()=>changeDate($('recordDate').value);$('weight').oninput=()=>{draft.weight=$('weight').value;renderEnergy()};$('daynote').oninput=()=>draft.note=$('daynote').value;$('saveDay').onclick=saveDay;$('saveFood').onclick=saveDay;$('copyDay').onclick=()=>{sync();copy(dayReport(current,draft))};$('copyFood').onclick=()=>copy('【Chapi Fit 食事 '+current+'】\n'+foodReport(draft));$('restDay').onchange=()=>{draft.restDay=$('restDay').checked;renderEnergy()};$('mascot').onclick=()=>{$('mascotMessage').classList.toggle('hidden')};$('foodComplete').onchange=()=>draft.foodComplete=$('foodComplete').checked;$('strengthTotalMinutes').oninput=e=>updateStrengthTotal('minutes',e.target.value);$('strengthTotalKcal').oninput=e=>updateStrengthTotal('kcal',e.target.value);$('strengthTotalType').onchange=e=>updateStrengthTotal('energyType',e.target.value);$('addStrengthSession').onclick=()=>addSession('strength');$('addCardioSession').onclick=()=>addSession('cardio');$('prevMonth').onclick=()=>{month=C.plusMonths(month,-1);renderCalendar()};$('nextMonth').onclick=()=>{month=C.plusMonths(month,1);renderCalendar()};$('newTemplate').onclick=()=>startEditor();$('templateName').oninput=()=>{if(editing)editing.name=$('templateName').value};$('newStrengthItem').onclick=()=>{editing.items.push({id:uid(),name:'新しい筋トレ',kind:'strength',kg:0,sets:3,target:'10〜12回'});renderEditor()};$('newCardioItem').onclick=()=>{editing.items.push({id:uid(),name:'有酸素運動',kind:'cardio'});renderEditor()};$('cancelTemplate').onclick=()=>{if(editing&&!confirm('メニュー編集を保存せず閉じますか？'))return;editing=null;$('templateEditor').classList.add('hidden')};$('saveTemplate').onclick=saveTemplate;$('saveProfile').onclick=saveProfile;$('targetKcal').onchange=e=>commitMacro('kcal',e.target.value);$('macroMode').onchange=()=>{targetsDraft.mode=$('macroMode').value;markDirty('targets');renderMacros()};$('unlockAll').onclick=()=>{targetsDraft.locks={p:false,f:false,c:false};markDirty('targets');renderMacros();macroMessage('')};$('saveTargets').onclick=saveTargets;$('suggestTargets').onclick=showSuggestion;
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));$('openSettings').onclick=()=>switchTab('settings');$('recordDate').onchange=()=>changeDate($('recordDate').value);$('weight').oninput=()=>{draft.weight=$('weight').value;renderEnergy()};$('daynote').oninput=()=>draft.note=$('daynote').value;$('saveDay').onclick=saveDay;$('saveDayTop').onclick=saveDay;$('saveFood').onclick=saveDay;$('copyDay').onclick=()=>{sync();copy(dayReport(current,draft))};$('copyDayTop').onclick=()=>{sync();copy(dayReport(current,draft))};$('backToTop').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});const updateBackToTop=()=>{$('backToTop').hidden=window.scrollY<280};window.addEventListener('scroll',updateBackToTop,{passive:true});updateBackToTop();$('aiCopyRequest').onclick=aiCopyRequest;$('aiParse').onclick=aiPreview;$('aiAccept').onclick=aiAccept;$('aiAcceptTop').onclick=aiAccept;$('aiClear').onclick=()=>{$('aiResult').value='';aiDiscard();notice('JSONだけを消去しました')};$('aiDiscard').onclick=()=>{if(aiPending&&!confirm('確認中の仮データを破棄しますか？ JSONと食べたものの文章は残ります。'))return;aiDiscard();notice('確認中の仮データを破棄しました')};$('aiResult').oninput=()=>{aiPending=null;$('aiAccept').disabled=true;$('aiAcceptTop').disabled=true;$('aiPreview').textContent=''};$('copyFood').onclick=()=>copy('【Chapi Fit 食事 '+current+'】\n'+foodReport(draft));document.querySelectorAll('.faq-shortcut').forEach(link=>link.addEventListener('click',e=>{e.preventDefault();const faq=$('aiFaq');if(!faq)return;const first=faq.querySelector('details');if(first)first.open=true;faq.scrollIntoView({behavior:'smooth',block:'start'});}));$('restDay').onchange=()=>{draft.restDay=$('restDay').checked;renderEnergy()};$('mascot').onclick=()=>{$('mascotMessage').classList.toggle('hidden')};$('foodComplete').onchange=()=>draft.foodComplete=$('foodComplete').checked;$('strengthTotalMinutes').oninput=e=>updateStrengthTotal('minutes',e.target.value);$('strengthTotalKcal').oninput=e=>updateStrengthTotal('kcal',e.target.value);$('strengthTotalType').onchange=e=>updateStrengthTotal('energyType',e.target.value);$('addStrengthSession').onclick=()=>addSession('strength');$('addCardioSession').onclick=()=>addSession('cardio');$('prevMonth').onclick=()=>{month=C.plusMonths(month,-1);renderCalendar()};$('nextMonth').onclick=()=>{month=C.plusMonths(month,1);renderCalendar()};$('newTemplate').onclick=()=>startEditor();$('templateName').oninput=()=>{if(editing)editing.name=$('templateName').value};$('newStrengthItem').onclick=()=>{editing.items.push({id:uid(),name:'新しい筋トレ',kind:'strength',kg:0,sets:3,target:'10〜12回'});renderEditor()};$('newCardioItem').onclick=()=>{editing.items.push({id:uid(),name:'有酸素運動',kind:'cardio'});renderEditor()};$('cancelTemplate').onclick=()=>{if(editing&&!confirm('メニュー編集を保存せず閉じますか？'))return;editing=null;$('templateEditor').classList.add('hidden')};$('saveTemplate').onclick=saveTemplate;$('saveProfile').onclick=saveProfile;$('targetKcal').onchange=e=>commitMacro('kcal',e.target.value);$('macroMode').onchange=()=>{targetsDraft.mode=$('macroMode').value;markDirty('targets');renderMacros()};$('unlockAll').onclick=()=>{targetsDraft.locks={p:false,f:false,c:false};markDirty('targets');renderMacros();macroMessage('')};$('saveTargets').onclick=saveTargets;$('suggestTargets').onclick=showSuggestion;
 for(const id of ['goalCurrent','goalTarget','goalMonths'])$(id).oninput=()=>{markDirty('goal');if(id==='goalMonths')$('goalMonthsRange').value=$('goalMonths').value;renderGoalPreview()};$('goalMonthsRange').oninput=()=>{$('goalMonths').value=$('goalMonthsRange').value;markDirty('goal');renderGoalPreview()};for(const [id,n] of [['monthsMinus',-1],['monthsPlus',1]])$(id).onclick=()=>{$('goalMonths').value=Math.max(1,Math.min(60,(Number($('goalMonths').value)||1)+n));$('goalMonthsRange').value=$('goalMonths').value;markDirty('goal');renderGoalPreview()};$('goalExerciseWeekly').oninput=()=>{markDirty('goal');$('goalExerciseRange').value=Math.min(5000,Number($('goalExerciseWeekly').value)||0);renderGoalPreview()};$('goalExerciseRange').oninput=()=>{$('goalExerciseWeekly').value=$('goalExerciseRange').value;markDirty('goal');renderGoalPreview()};$('saveGoal').onclick=saveGoal;$('useGoalCalories').onclick=applyGoalCalories;for(const event of ['input','change'])$('settings').addEventListener(event,e=>{const section=e.target.closest('[data-settings]')?.dataset.settings;if(section)markDirty(section)});$('exportBackup').onclick=exportBackup;$('importBackup').onclick=()=>$('importFile').click();$('importFile').onchange=e=>importBackup(e.target.files[0]);$('exportOriginal').onclick=()=>{const original=localStorage.getItem(BACKUP);if(original)download({app:'chapi-training',version:2,store:JSON.parse(original)},'chapi-fit-before-v3.json');else notice('更新前データはありません。通常のバックアップを書き出してください。')};
 $('weightGraphTab').onclick=()=>{graphMode='weight';renderGraphs()};$('balanceGraphTab').onclick=()=>{graphMode='balance';renderGraphs()};$('balancePeriod').onchange=()=>{graphWeek=today();renderGraphs()};$('graphPeriod').onchange=renderGraphs;$('showAverage').onchange=renderGraphs;$('prevWeek').onclick=()=>{graphWeek=C.plusDays(graphWeek,-($('balancePeriod').value==='week'?7:Number($('balancePeriod').value)));renderGraphs()};$('nextWeek').onclick=()=>{graphWeek=C.plusDays(graphWeek,($('balancePeriod').value==='week'?7:Number($('balancePeriod').value)));renderGraphs()};window.addEventListener('beforeunload',e=>{if(dayDirty()||settingsDirty||editing){e.preventDefault();e.returnValue=''}});document.addEventListener('visibilitychange',()=>{if(!document.hidden)rollover()});setInterval(rollover,60000);window.addEventListener('storage',e=>{if(e.key===KEY){blocked=true;externalConflict=true;$('fatal').classList.remove('hidden');$('fatal').textContent='別のタブで記録が更新されました。上書きを防ぐため保存を停止しました。必要な入力をコピーして再読み込みしてください。'}});
 refreshPickers();chooseDate(current);if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});

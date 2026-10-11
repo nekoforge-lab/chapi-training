@@ -164,3 +164,171 @@ nav button:not(.active){background:linear-gradient(180deg,#e9f8f8,#d9edef);box-s
 .energy-card .mascot-coach-title{display:block;font-size:14px;line-height:1.45;font-weight:800;color:#18566c}
 .energy-card .mascot-coach-advice{display:block;font-size:12px;line-height:1.6;font-weight:400;color:#365e6b}
 @media(max-width:380px){.energy-card .energy-comment-area{min-height:180px}.energy-card .mascot-message{padding:11px 10px}.energy-card .mascot-coach-title{font-size:13px}.energy-card .mascot-coach-advice{font-size:11px}}
+
+/* Smartwatch daily total input */
+.watch-control{margin:12px 0;padding:12px;border:1px solid var(--border,#dbe6e7);border-radius:14px}.watch-control .row{display:flex;align-items:center;justify-content:space-between;gap:12px}.watch-control .hint{margin:4px 0;font-size:.8rem}.watch-control label:not(.watch-switch){display:block;margin-top:10px}.watch-control input[type=number]{display:block;width:100%;margin-top:5px}.watch-switch{position:relative;display:inline-block;width:52px;height:32px;flex:none;cursor:pointer}.watch-switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0}.watch-track{position:absolute;inset:0;background:#9b9b9f;border-radius:99px;transition:background .18s}.watch-track:before{content:"";position:absolute;width:26px;height:26px;left:3px;top:3px;background:white;border-radius:50%;box-shadow:0 1px 3px #0004;transition:transform .18s}.watch-switch input:checked+.watch-track{background:#34c759}.watch-switch input:checked+.watch-track:before{transform:translateX(20px)}.watch-switch input:focus-visible+.watch-track{outline:3px solid #1885bd;outline-offset:3px}
+
+/* Weekly balance: compact, non-overlapping numbers and consistent balance colors. */
+#weeklyCard #weekTarget{font-size:clamp(17px,4.5vw,25px);line-height:1.35;overflow-wrap:anywhere;margin:8px 0}
+#weeklyCard #weekSummary p{margin:5px 0;overflow-wrap:anywhere}
+#weeklyCard #weekSummary b{font-variant-numeric:tabular-nums}
+#weeklyCard .week-row{grid-template-columns:1.3em minmax(0,1fr) minmax(88px,auto);gap:6px}
+#weeklyCard .week-amount{font-size:clamp(10px,2.8vw,13px);white-space:nowrap}
+#weeklyCard .week-bar.negative{background:#2478bf}
+#weeklyCard .week-bar.positive{background:#bc4554}
+@media(max-width:370px){#weeklyCard .week-row{grid-template-columns:1em minmax(0,1fr) minmax(80px,auto);gap:4px}}
+/* Weekly balance text uses the same deficit/surplus palette as its bars. */
+#weeklyCard .negative{color:#2478bf}
+#weeklyCard .positive{color:#bc4554}
+
+/* v3.5 test additions */
+.brand-logo{display:block;width:min(220px,54vw);height:auto;max-height:72px;object-fit:contain;object-position:left center}
+.date-card .quick-actions{grid-column:1/-1;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.quick-actions button{padding:10px 5px;font-size:13px;white-space:normal}
+.calendar .marks{font-size:10px;white-space:normal;overflow-wrap:anywhere;text-align:center;min-height:14px}
+@media(max-width:360px){.calendar .marks{font-size:9px}.brand-logo{width:min(190px,52vw)}}
+
+/* UI-01: trim header whitespace only. */
+header{margin-bottom:10px}
+
+/* UI-03: Q&A shortcut */
+.faq-shortcut{display:inline-block;margin:8px 0 3px;padding:8px 2px;font-size:13px;font-weight:650;line-height:1.6;text-underline-offset:3px}
+#aiFaq{scroll-margin-top:84px}
+
+/* AI food import */
+.ai-food-card textarea{width:100%;min-height:90px}.ai-item-details{margin:12px 0;padding:12px;border:1px solid #b9d4dc;border-radius:12px}.ai-item{padding:12px 0;border-top:1px solid #d5e5ec}.ai-item label{display:block;margin:7px 0}.ai-item input,.ai-item textarea{width:100%}#aiPreview{overflow-wrap:anywhere}#aiPreview p{font-size:.9rem}#backToTop{width:100%}
+
+/* Chapi Fit v3.5: independent help tutorial */
+.guide-launch-row{display:flex;justify-content:flex-end;margin:0 2px 10px}
+.guide-launch{background:#e9f7f5!important;border:1.5px solid #40afa9!important;color:#176e70!important;font-weight:800!important;border-radius:12px!important;padding:9px 16px!important;min-height:44px}
+.guide-overlay{position:fixed;inset:0;z-index:9999;background:#123d48a8;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+body.guide-open{overflow:hidden}
+.guide-panel{width:min(100%,440px);max-height:min(90dvh,740px);overflow:auto;overscroll-behavior:contain;background:#f8fcfc;border:2px solid #9cdbd8;border-radius:22px;padding:17px;box-sizing:border-box;box-shadow:0 18px 55px #103e4b55;color:#1b5962}
+.guide-top{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:17px}
+.guide-close{min-height:42px!important;padding:8px 12px!important;background:#e6f4f4!important;color:#1d6870!important;border:1px solid #b6dcda!important;border-radius:11px!important;font-size:13px!important}
+.guide-progress{margin:15px 0 13px;display:flex;align-items:center;gap:13px;font-size:12px;font-weight:800;color:#3a7c80}
+.guide-dots{display:flex;gap:5px;flex:1}.guide-dots span{flex:1;height:6px;background:#d9e8e8;border-radius:9px}.guide-dots span.active{background:#0da59e}
+.guide-slide{min-height:290px;background:linear-gradient(160deg,#fff,#eaf8f8);border:1px solid #cde9e6;border-radius:17px;padding:20px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:center;touch-action:pan-y;box-sizing:border-box}
+.guide-illustration{width:88px;height:88px;border-radius:22px;display:grid;place-items:center;background:#d8f2ee;border:2px solid #8ed5cf;font-size:44px;margin-bottom:13px}
+.guide-slide h2{color:#166a6d;font-size:20px;line-height:1.4;margin:0 0 10px}
+.guide-slide p{font-size:15px;line-height:1.7;margin:0 0 12px;color:#285f66}
+.guide-slide .guide-hint{font-size:13px;background:#f0f8f7;border-left:3px solid #1baaa0;border-radius:8px;padding:10px;text-align:left;width:100%;box-sizing:border-box;margin:0}
+.guide-controls{display:flex;justify-content:space-between;gap:10px;margin-top:15px}.guide-controls button{min-height:46px;min-width:105px}.guide-controls button:disabled{opacity:.4}
+@media(max-width:370px){.guide-panel{padding:12px}.guide-slide{padding:14px 12px;min-height:265px}.guide-slide h2{font-size:18px}}
+
+/* AI food import preview: compact, readable mobile cards */
+#aiPreview{margin-top:14px;overflow-wrap:anywhere}
+#aiPreview>h3{font-size:1.08rem;margin:0 0 12px;color:#17676e}
+.ai-preview-total{background:#eaf6f5;border:1px solid #9ed5d1;border-radius:15px;padding:16px;margin-bottom:14px}
+.ai-preview-caption{font-size:.8rem;color:#42777b}
+.ai-preview-energy{display:block;font-size:1.85rem;line-height:1.4;color:#145d66;font-variant-numeric:tabular-nums}
+.ai-preview-macros{display:flex;flex-wrap:wrap;gap:8px 16px;color:#476e75;font-size:.85rem;font-variant-numeric:tabular-nums;margin-top:8px}
+.ai-preview-list{display:grid;gap:10px}
+.ai-preview-card{background:#fff;border:1px solid #bfd7dc;border-radius:13px;padding:13px;min-width:0}
+.ai-preview-heading{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.ai-preview-heading>div{min-width:0;flex:1}
+.ai-preview-heading strong{display:block;line-height:1.4;overflow-wrap:anywhere}
+.ai-preview-heading small{display:block;color:#607d84;margin-top:3px;overflow-wrap:anywhere}
+.ai-preview-kcal{white-space:nowrap;color:#176b73;font-variant-numeric:tabular-nums}
+.ai-preview-note{margin-top:10px;border-top:1px solid #e0ebee;padding-top:8px}
+.ai-preview-note summary{font-size:.83rem;color:#286f78;cursor:pointer;font-weight:650}
+#aiPreview .ai-preview-note p{font-size:.83rem;line-height:1.65;margin:8px 0 0;white-space:pre-wrap}
+@media(max-width:390px){.ai-preview-card{padding:11px}.ai-preview-macros{gap:6px 10px;font-size:.8rem}}
+
+/* v3.5: global floating return-to-top and clearer AI food review */
+.back-to-top{position:fixed;right:calc(14px + env(safe-area-inset-right, 0px));bottom:calc(82px + env(safe-area-inset-bottom, 0px));z-index:40;width:48px;height:48px;min-width:48px;padding:0;border:1px solid #a4d2d1;border-radius:50%;background:#13767b;color:#fff;font-size:1.45rem;font-weight:700;box-shadow:0 4px 15px #174b4b44;cursor:pointer;display:grid;place-items:center;transition:opacity .18s ease,transform .18s ease}
+.back-to-top[hidden]{display:none!important}
+.back-to-top:focus-visible{outline:3px solid #f5ab4b;outline-offset:3px}
+.ai-preview-total{padding:18px 16px;margin:14px 0 16px;background:#eaf6f5;border:1px solid #9ed5d1;border-radius:16px}
+.ai-preview-energy{font-size:2.15rem;line-height:1.35}
+.ai-preview-macros{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.ai-preview-macros span{display:block;min-width:0;padding:7px 5px;text-align:center;border-radius:8px;background:#f0f7f8;overflow-wrap:anywhere;font-size:.82rem}
+.ai-preview-total .ai-preview-macros span{background:#fff}
+.ai-preview-list{gap:12px}
+.ai-preview-card{padding:15px;border:1px solid #b9d6db;border-radius:14px;box-shadow:0 2px 6px #20494b0b}
+.ai-preview-heading{gap:12px;align-items:start}
+.ai-preview-heading small{margin-top:5px}
+.ai-preview-kcal{font-size:1.03rem}
+@media(max-width:390px){.ai-preview-macros{gap:5px}.ai-preview-macros span{font-size:.75rem;padding:7px 3px}.ai-preview-card{padding:12px}}
+@media(prefers-reduced-motion:reduce){.back-to-top{transition:none}}
+
+/* Fixed scroll-to-top: isolate from app layout and generic button styles. */
+body > #backToTop.back-to-top {
+  position:fixed!important; inset:auto calc(16px + env(safe-area-inset-right, 0px)) calc(92px + env(safe-area-inset-bottom, 0px)) auto!important;
+  display:flex!important; align-items:center; justify-content:center;
+  box-sizing:border-box!important; width:48px!important; min-width:48px!important; max-width:48px!important;
+  height:48px!important; min-height:48px!important; max-height:48px!important;
+  flex:none!important; padding:0!important; margin:0!important;
+  border:3px solid #145d67!important; border-radius:50%!important;
+  background:#d7f1ef!important; background-image:none!important; color:#145d67!important;
+  box-shadow:0 3px 10px #163c4760,0 0 0 2px #ffffffdd!important;
+  font-size:24px!important; line-height:1!important; font-weight:800!important;
+  z-index:100!important; touch-action:manipulation;
+}
+body > #backToTop.back-to-top[hidden] {display:none!important;}
+
+/* v3.5 meal-save UX */
+.meal-save{display:block;width:100%;margin:10px 0 5px}.ai-json-actions{display:flex;flex-wrap:wrap;gap:7px;margin:9px 0}.ai-json-actions button{flex:1 1 125px}.ai-food-card #aiAcceptTop,.ai-food-card #aiAccept{width:100%;margin:8px 0}.ai-food-card #aiAcceptTop:disabled{display:none}.date-card{gap:8px;padding-top:13px;padding-bottom:13px}.date-card .quick-actions{margin:0}.date-card .quick-actions button{min-height:44px}.date-card .faq-shortcut{margin:0;padding:0;font-size:12px;line-height:1.4}.faq-shortcut{margin:3px 0;padding:2px}.ai-preview-macros{gap:8px;flex-wrap:wrap}
+
+/* v3.5 compact food UX */
+.ai-food-card{padding:0;overflow:hidden;border-color:#7fcfcb;box-shadow:0 3px 0 #b7e5e2,0 8px 18px #1c73751a}
+.ai-food-card>details{margin:0}
+.ai-food-summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 17px;cursor:pointer;background:linear-gradient(135deg,#eefcfb,#d8f3f1);color:#145f68}
+.ai-food-summary::-webkit-details-marker{display:none}
+.ai-food-summary span:first-child{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ai-food-summary b{font-size:17px;line-height:1.35}
+.ai-food-summary small{font-size:11px;color:#527b80;font-weight:600;line-height:1.45}
+.ai-food-open{flex:none;border-radius:999px;background:#177c80;color:#fff;padding:7px 10px;font-size:11px;font-weight:800;white-space:nowrap}
+.ai-food-summary .ai-food-open:after{content:' ▼'}
+#aiFoodDetails[open] .ai-food-open:after{content:' ▲'}
+#aiFoodDetails[open] .ai-food-open{background:#e5f6f5;color:#17666b;border:1px solid #8acbc8}
+.ai-food-body{padding:4px 17px 17px}
+.meal-section{border:1px solid #b8d9dc;border-radius:17px;padding:14px 13px 15px;margin:12px 0;background:linear-gradient(180deg,#fff,#fbfefe);box-shadow:0 2px 7px #174f5710}
+.meal-section+.meal-section{margin-top:16px}
+.meal-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;margin-bottom:11px;padding-bottom:9px;border-bottom:2px solid #d7eeee}
+.meal-head h3{margin:0;font-size:18px;color:#205d69}
+.meal-head .meal-skip{margin:0;justify-self:start;font-size:13px;white-space:nowrap}
+.meal-head .meal-save{width:auto;min-width:64px;min-height:38px;margin:0;padding:8px 13px;border:0;border-radius:11px;background:#177c80;color:#fff;font-weight:800;box-shadow:0 3px 0 #0f5f63}
+.meal-head .meal-save:active{transform:translateY(2px);box-shadow:0 1px 0 #0f5f63}
+.ai-food-card #aiAcceptTop:disabled,.ai-food-card #aiAccept:disabled{display:none!important}
+@media(max-width:390px){.ai-food-summary{padding:14px 13px}.ai-food-summary b{font-size:15px}.ai-food-open{padding:6px 8px}.meal-section{padding:12px 10px}.meal-head{gap:6px}.meal-head h3{font-size:17px}.meal-head .meal-skip{font-size:12px}.meal-head .meal-save{min-width:58px;padding:8px 10px}}
+
+
+/* v3.5 final UX polish: compact but prominent AI entry + tighter record header */
+.ai-food-summary{padding:15px 16px;gap:10px;align-items:center}
+.ai-food-copy{display:flex!important;flex-direction:column;gap:5px;min-width:0;flex:1}
+.ai-food-summary b{font-size:20px;line-height:1.25;letter-spacing:-.2px;color:#125a64}
+.ai-food-summary small{display:block;font-size:13px;line-height:1.45;color:#4b7379;font-weight:650}
+.ai-food-open{font-size:13px;padding:9px 12px;box-shadow:0 2px 0 #0f5f63}
+#aiFoodDetails[open] .ai-food-summary{padding-bottom:13px}
+#aiFoodDetails[open] .ai-food-summary b{font-size:18px}
+#aiFoodDetails[open] .ai-food-summary small{font-size:12px}
+/* Only show commit buttons after a valid preview exists. */
+.ai-food-card #aiAcceptTop:disabled,.ai-food-card #aiAccept:disabled{display:none!important}
+/* Tighter top controls on Record without changing stored data or calculations. */
+.date-card{padding:10px 14px;gap:7px 10px;align-items:end}
+.date-card label{font-size:12px;line-height:1.35}
+.date-card label input{margin-top:3px;min-height:42px;padding:8px 10px}
+.date-card .quick-actions{gap:6px}
+.date-card .quick-actions button{min-height:40px;padding:7px 10px;font-size:13px}
+.date-card .faq-shortcut{font-size:11px;line-height:1.25;justify-self:end;align-self:center}
+.energy-card{padding-top:15px}
+.energy-card .energy-header{margin-bottom:3px}
+.energy-comment-area{margin-top:0!important;margin-bottom:2px!important}
+@media(max-width:430px){
+ .ai-food-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:14px 13px}
+ .ai-food-summary b{font-size:18px}
+ .ai-food-summary small{font-size:12px}
+ .ai-food-open{font-size:12px;padding:8px 10px}
+ .date-card{padding:9px 12px}
+}
+@media(max-width:370px){
+ .ai-food-summary{grid-template-columns:1fr}
+ .ai-food-open{justify-self:start}
+}
+
+
+/* v3.5 release-candidate finishing touches */
+.date-card .faq-shortcut{grid-column:2;justify-self:end;text-align:right}
+.meal-head .meal-save{background:#0f7479!important;color:#fff!important;border-color:#0f7479!important;opacity:1!important;box-shadow:0 3px 0 #09565a!important}
+.meal-head .meal-save:hover{filter:brightness(.96)}
