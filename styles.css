@@ -332,3 +332,32 @@ body > #backToTop.back-to-top[hidden] {display:none!important;}
 .date-card .faq-shortcut{grid-column:2;justify-self:end;text-align:right}
 .meal-head .meal-save{background:#0f7479!important;color:#fff!important;border-color:#0f7479!important;opacity:1!important;box-shadow:0 3px 0 #09565a!important}
 .meal-head .meal-save:hover{filter:brightness(.96)}
+
+/* v3.6 meal quick actions: compact, finger-friendly on iPhone */
+.meal-quick-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.meal-quick-actions button{width:auto;min-height:40px;margin:0;padding:8px 12px;border-radius:10px;font-size:13px;font-weight:700}
+.meal-quick-actions .meal-copy{background:#eef9f9;color:#155c67;border:1px solid #a8d5d9}
+.meal-quick-actions .meal-delete{background:#fff5f5;color:#a52e38;border:1px solid #e9bfc4}
+
+/* v3.6 exercise menu grouping */
+.template-group{border:1px solid var(--line,#d9e2e8);border-radius:14px;margin:12px 0;padding:8px 12px}
+.template-group>summary{cursor:pointer;font-weight:700;padding:10px 4px}
+.template-group .template-card{margin:10px 0}
+
+/* Bodyweight without added load: keep header and fields in the same four columns. */
+.set-head.no-weight,.set-row.no-weight{grid-template-columns:22px minmax(0,1fr) minmax(0,.8fr) 35px}
+
+/* v3.6 stage 4: clockwise intake, counterclockwise exercise gauge. */
+.energy-donut,.energy-donut.energy-breakdown-ready{background:#f5fafc;transform:none}
+.energy-donut:before,.energy-donut.energy-breakdown-ready:before{inset:20%;z-index:1;background:#fff}
+.energy-ring-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:0}
+.energy-donut-center{z-index:2}
+
+/* v3.6 stage 5: inline exercise saving and cardio estimate */
+.cardio-estimator{border:1px solid #b9d8df;background:#f0f9fa;border-radius:12px;padding:12px;margin-top:12px}
+.cardio-estimator strong{font-size:13px}
+.cardio-estimator button{width:100%;margin:5px 0}
+.exercise-save-actions{margin-top:12px}
+.exercise-save-actions button{width:100%}
+
+.energy-watch-note{display:block;font-size:10px;line-height:1.35;color:#4a7280;margin-top:4px;overflow-wrap:anywhere}
