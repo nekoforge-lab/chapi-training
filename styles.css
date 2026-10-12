@@ -361,3 +361,16 @@ body > #backToTop.back-to-top[hidden] {display:none!important;}
 .exercise-save-actions button{width:100%}
 
 .energy-watch-note{display:block;font-size:10px;line-height:1.35;color:#4a7280;margin-top:4px;overflow-wrap:anywhere}
+
+/* v3.7 preview: circuit round entries */
+.round-entry{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto auto;gap:7px;align-items:end;margin:10px 0}.round-entry label{margin:0}.round-entry .check{align-self:center;white-space:nowrap}.round-entry button{padding:7px;min-height:44px}.round-total{font-weight:700;color:var(--green)}@media(max-width:420px){.round-entry{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}.round-entry .check,.round-entry button{align-self:center}}
+
+/* v3.7 test03: circuit and copy action refinements */
+.round-entry.bodyweight-round{grid-template-columns:minmax(0,1fr) auto auto;max-width:440px}
+.set-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.set-actions button{flex:1 1 120px;min-height:44px;border-radius:11px}
+.food-report-action{margin:12px 0 4px}
+.food-report-action button{min-height:44px}
+@media(max-width:420px){.round-entry.bodyweight-round{grid-template-columns:minmax(0,1fr) auto auto}}
+\n.save-failed{color:#b92b2b;font-weight:700}\n
+.settings-entry{display:flex;flex-direction:column;align-items:center;gap:3px}.build-label{font-size:10px;color:#84929b;font-weight:400;line-height:1.2}
