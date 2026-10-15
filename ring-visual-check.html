@@ -1,0 +1,40 @@
+<!doctype html><meta charset="utf-8"><style>body{display:flex;gap:20px;background:#eee;padding:25px}.donut{width:240px;height:240px;position:relative;background:#fff;border-radius:50%}svg{position:absolute;inset:0;width:100%;height:100%}</style><div class="donut" id="a"></div><div class="donut" id="b"></div><script>function drawIntakeGauge(root,total,food,exercise,foodRecorded=true){
+ let svg=root.querySelector('.energy-ring-svg');
+ if(!svg){svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 220 220');svg.setAttribute('aria-hidden','true');svg.classList.add('energy-ring-svg');root.prepend(svg)}
+ svg.replaceChildren();
+ const ns='http://www.w3.org/2000/svg',r=91,w=29;
+ const add=(tag,attrs)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));svg.append(el);return el};
+ const point=(deg,rad=r)=>{const a=(deg-90)*Math.PI/180;return [110+rad*Math.cos(a),110+rad*Math.sin(a)]};
+ const arc=(start,end,color)=>{
+  const span=end-start;if(span<0.00001)return;
+  if(span>=359.99999){add('circle',{cx:110,cy:110,r,fill:'none',stroke:color,'stroke-width':w});return}
+  const [x1,y1]=point(start),[x2,y2]=point(end);
+  add('path',{d:`M ${x1} ${y1} A ${r} ${r} 0 ${span>180?1:0} 1 ${x2} ${y2}`,fill:'none',stroke:color,'stroke-width':w,'stroke-linecap':'butt'});
+ };
+ // A separator is placed on the ACTUAL junction of two colored arcs,
+ // not at the modulo food or balance angle calculated independently.
+ const separator=deg=>{
+  const [x1,y1]=point(deg,r-w/2),[x2,y2]=point(deg,r+w/2);
+  add('line',{x1,y1,x2,y2,stroke:'#fff','stroke-width':2.5,'stroke-linecap':'butt','data-energy-separator':'true'});
+ };
+ add('circle',{cx:110,cy:110,r,fill:'none',stroke:'#e7eff2','stroke-width':w});
+ if(!(Number.isFinite(total)&&total>0&&foodRecorded))return;
+ const intake=Math.max(0,Number(food)||0),work=Math.max(0,Number(exercise)||0);
+ // The ring is a fixed 360-degree expenditure scale. Exercise occupies
+ // part of that scale; it NEVER expands the total or adds to food.
+ const excess=Math.min(total,Math.max(0,intake-total));
+ const orange=Math.min(total-excess,work,Math.max(0,intake-excess));
+ const blue=Math.min(total-excess-orange,Math.max(0,intake-excess-orange));
+ const unit=360/total,segments=[];
+ if(excess>0){segments.push([excess,'#e96b78']);if(orange>0)segments.push([orange,'#ef9b43']);if(blue>0)segments.push([blue,'#3299bc'])}
+ else{if(blue>0)segments.push([blue,'#3299bc']);if(orange>0)segments.push([orange,'#ef9b43'])}
+ let angle=0;
+ segments.forEach(([value,color],i)=>{const next=angle+value*unit;arc(angle,next,color);angle=next});
+ // White dividers are presentation-only and drawn LAST, above the arcs.
+ angle=0;
+ for(let i=0;i<segments.length-1;i++){angle+=segments[i][0]*unit;separator(angle)}
+}
+
+drawIntakeGauge(document.getElementById('a'),2789,3880,336,true);
+drawIntakeGauge(document.getElementById('b'),2789,1880,336,true);
+</script>

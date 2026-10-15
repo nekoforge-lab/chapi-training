@@ -11,7 +11,7 @@ function plusMonths(s,n){const d=date(s),day=d.getDate();d.setDate(1);d.setMonth
 function age(birth,on){const b=date(birth),d=date(on);if(!b||!d||b>d)return null;let a=d.getFullYear()-b.getFullYear();if(d.getMonth()<b.getMonth()||(d.getMonth()===b.getMonth()&&d.getDate()<b.getDate()))a--;return a<=120?a:null}
 const numeric=x=>x!==''&&x!==null&&x!==undefined&&Number.isFinite(Number(x));
 const nonnegative=x=>numeric(x)&&Number(x)>=0;
-const defaults={bench:['DBベンチプレス',16,3,'8〜12回'],row:['チェストサポートロー',12,3,'10〜12回'],press:['DBショルダープレス',10,2,'8〜12回'],lateral:['サイドレイズ',4,2,'12〜15回'],curl:['インクラインカール',8,3,'10〜12回'],skull:['スカルクラッシャー',8,2,'10〜12回'],squat:['DBスクワット',16,3,'10〜15回'],rdl:['DB RDL',18,3,'10〜12回'],shrug:['DBシュラッグ',18,2,'12〜15回'],calf:['カーフレイズ',0,3,'15〜25回'],forearm:['前腕サーキット',6,2,'2周']};
+const defaults={bench:['ダンベルベンチプレス',16,3,'8〜12回'],row:['チェストサポートロー',12,3,'10〜12回'],press:['ダンベルショルダープレス',10,2,'8〜12回'],lateral:['サイドレイズ',4,2,'12〜15回'],curl:['インクラインカール',8,3,'10〜12回'],skull:['スカルクラッシャー',8,2,'10〜12回'],squat:['ダンベルスクワット',16,3,'10〜15回'],rdl:['ダンベルルーマニアンデッドリフト',18,3,'10〜12回'],shrug:['ダンベルシュラッグ',18,2,'12〜15回'],calf:['カーフレイズ',0,3,'15〜25回'],forearm:['前腕サーキット',6,2,'2周']};
 const forearmNote='リストカール30秒 → リバースリストカール30秒 → スタンディング・リストカール30秒。各種目間休憩10秒。2周を基本とする。';
 const plans={mon:['bench','row','press','lateral','curl','skull'],thu:['squat','rdl','shrug','calf','forearm'],sat:['squat','bench','row','rdl','press','lateral','shrug','calf','curl','skull']};
 function item(id){const d=defaults[id];return {id,name:d[0],kind:'strength',kg:d[1],sets:d[2],target:d[3],...(id==='forearm'?{tracking:'rounds',rounds:2,annotation:forearmNote}:id==='calf'?{strengthType:'bodyweight'}:{})}}
@@ -40,7 +40,58 @@ function migrate(raw){validateStore(raw);const s=clone(raw);if((s.schemaRevision
  if(!s.templates.some(t=>t.id==='cf-bodyweight-circuit-v37'))s.templates.push(extraTemplates().find(t=>t.id==='cf-bodyweight-circuit-v37'));
  // Rename only built-in default names, not customized titles or historical sessions.
  for(const t of s.templates){const names={mon:['上半身のみ','ダンベル上半身トレーニング'],thu:['下半身のみ','ダンベル下半身トレーニング'],sat:['全身','ダンベル全身トレーニング']};const pair=names[t.id];if(pair&&t.name===pair[0])t.name=pair[1]}
+ // Display-name upgrades apply only to exact untouched built-in item labels; day history stays immutable.
+ const builtInNames={'DBベンチプレス':'ダンベルベンチプレス','DBショルダープレス':'ダンベルショルダープレス','DBスクワット':'ダンベルスクワット','DB RDL':'ダンベルルーマニアンデッドリフト','DBシュラッグ':'ダンベルシュラッグ'};
+ for(const t of s.templates)for(const i of t.items)if(Object.prototype.hasOwnProperty.call(builtInNames,i.name)&&['bench','press','squat','rdl','shrug'].includes(i.id))i.name=builtInNames[i.name];
+ // Add a basic abdominal exercise once; do not touch existing workouts or preset IDs.
+ if(!s.templates.some(t=>t.id==='cf-situp-v38'))s.templates.push({id:'cf-situp-v38',name:'上体起こし',items:[{id:'situp-v38',name:'上体起こし',kind:'strength',strengthType:'bodyweight',sets:3,target:'10〜15回'}]});
  s.goalHistory=s.goalHistory||[];return s}
+// v3.8 stage 1: read-only identity audit. Never infer identity from names alone.
+function auditExerciseIds(s){
+ validateStore(s);
+ const ids=new Map(),missing=[];
+ const add=(it,source,active)=>{
+  const id=typeof it.id==='string'?it.id.trim():'';
+  if(!id){missing.push({source,name:it.name||''});return}
+  if(!ids.has(id))ids.set(id,{id,usages:[],currentNames:new Set(),historicalNames:new Set(),kinds:new Set()});
+  const e=ids.get(id);e.usages.push(source);e.kinds.add(String(it.kind||'strength'));
+  (active?e.currentNames:e.historicalNames).add(String(it.name||''));
+ };
+ for(const t of s.templates)for(const it of t.items)add(it,'template:'+t.id,true);
+ for(const [day,d] of Object.entries(s.days))for(const session of d.sessions||[])for(const it of session.items||[])add(it,'day:'+day,false);
+ const collisions=[],historicalNameDifferences=[];
+ for(const e of ids.values()){
+  // Different names across active presets are ambiguous; historical snapshots may legitimately differ after a rename.
+  const activeConflict=e.currentNames.size>1;
+  const historicalOnlyConflict=e.currentNames.size===0&&e.historicalNames.size>1;
+  if(activeConflict||historicalOnlyConflict||e.kinds.size>1)collisions.push({id:e.id,names:[...new Set([...e.currentNames,...e.historicalNames])],kinds:[...e.kinds],usages:[...e.usages]});
+  else if(e.currentNames.size&&[...e.historicalNames].some(n=>!e.currentNames.has(n)))historicalNameDifferences.push({id:e.id,current:[...e.currentNames],historical:[...e.historicalNames]});
+ }
+ return {uniqueIds:ids.size,collisions,missing,historicalNameDifferences};
+}
+// Preview only. Historical records are never rewritten or merged by name.
+function previewExerciseLibrary(s){
+ const audit=auditExerciseIds(s),ambiguous=new Set(audit.collisions.map(x=>x.id)),library=new Map();
+ const add=it=>{
+  if(typeof it.id!=='string'||!it.id.trim()||ambiguous.has(it.id.trim()))return;
+  if(!library.has(it.id))library.set(it.id,{id:it.id,name:String(it.name||''),kind:it.kind||'strength',archived:false});
+ };
+ for(const t of s.templates)for(const it of t.items)add(it);
+ for(const d of Object.values(s.days))for(const session of d.sessions||[])for(const it of session.items||[])add(it);
+ return {exercises:[...library.values()],audit};
+}
+// Resolve presentation metadata by stable ID; never rewrite exercise results on rename.
+function exercisePresentation(s,record){
+ const id=record?.id;
+ const deleted=(s.deletedExerciseIds||[]).includes(id);
+ const explicit=Array.isArray(s.exerciseLibrary)?s.exerciseLibrary.find(x=>x.id===id):null;
+ const active=deleted?null:(explicit||s.templates.flatMap(t=>t.items).find(x=>x.id===id));
+ const name=active?.name??record?.name??'';
+ const annotation=active?.annotation??record?.annotation??'';
+ const builtins={bench:['DBベンチプレス','ダンベルベンチプレス'],press:['DBショルダープレス','ダンベルショルダープレス'],squat:['DBスクワット','ダンベルスクワット'],rdl:['DB RDL','ダンベルルーマニアンデッドリフト'],shrug:['DBシュラッグ','ダンベルシュラッグ']};
+ const pair=builtins[id];
+ return {name:pair&&name===pair[0]?pair[1]:name,annotation};
+}
 function normalizeDay(d){return {...{weight:'',calories:'',note:'',sessions:[],meals:{}},...clone(d||{}),sessions:clone(d?.sessions||[]),meals:clone(d?.meals||{})}}
 function weightAt(s,on,d){if(numeric(d?.weight)&&Number(d.weight)>0)return {weight:Number(d.weight),date:on};const ds=Object.keys(s.days).filter(k=>k<=on&&numeric(s.days[k].weight)&&Number(s.days[k].weight)>0).sort();if(!ds.length){const g=goalAt(s,on);return g&&Number(g.current)>0?{weight:Number(g.current),date:"体重目標の開始体重"}:null}const k=ds.at(-1);return {weight:Number(s.days[k].weight),date:k}}
 function baseEnergy(s,on,d){const p=s.profile||{},a=age(p.birth,on),w=weightAt(s,on,d),h=Number(p.height),activity=Number(p.lifeActivity);if(a===null||a<18||!w||!(h>=80&&h<=250)||!['male','female'].includes(p.sex)||![1.2,1.375,1.55,1.725].includes(activity))return null;const bmr=10*w.weight+6.25*h-5*a+(p.sex==='male'?5:-161);return bmr>0?{bmr,life:bmr*activity,activity,age:a,w}:null}
@@ -66,5 +117,5 @@ function weekStart(on){const d=date(on);return plusDays(on,-d.getDay())}
 function week(s,on,today){const start=weekStart(on),dates=Array.from({length:7},(_,i)=>plusDays(start,i)),g=goalAt(s,on),target=g?(on>g.end?0:g.weekly):null;let sum=0,count=0,complete=0;const values=dates.map(day=>{if(day>today||!s.days[day])return {date:day,balance:null};const e=energy(s,day);if(e.balance!==null){sum+=e.balance;count++;if(!e.provisional)complete++}return {date:day,balance:e.balance,provisional:e.provisional}});const end=dates[6],remaining=today<start?7:today>end?0:daysBetween(end,today)+1;const excludedPast=dates.filter(day=>day<today&&!s.days[day]).length;const adjustedTarget=target===null?null:target*(7-excludedPast)/7;return {start,end,dates,values,target:adjustedTarget,fullTarget:target,excludedPast,sum,count,complete,remaining,left:adjustedTarget===null?null:adjustedTarget-sum,perDay:adjustedTarget!==null&&remaining?(adjustedTarget-sum)/remaining:null,rate:adjustedTarget===null||adjustedTarget===0?null:sum/adjustedTarget*100}}
 function suggestion(s,on,purpose,goalDraft){const b=baseEnergy(s,on);const p=s.profile||{};if(!b)return {error:'先に成人のプロフィール・生活活動・体重を入力してください。'};if(p.special)return {error:'妊娠・授乳中、治療中などの場合は自動提案を使用せず、専門家と目標を設定してください。'};if(purpose==='custom')return {error:'カスタムでは現在の値をそのまま調整できます。'};const bmi=b.w.weight/(Number(p.height)/100)**2;if(bmi<18.5&&['loss','retain'].includes(purpose))return {error:'BMI 18.5未満の減量目標は自動提案しません。'};let kcal=b.life*(purpose==='loss'?.85:purpose==='retain'?.9:purpose==='gain'?1.05:1);kcal=Math.max(1500,kcal);const cap=25*(Number(p.height)/100)**2,goalW=goalDraft?.target||goalAt(s,on)?.target||b.w.weight,ref=Math.min(b.w.weight,Math.max(18.5*(Number(p.height)/100)**2,Math.min(cap,Number(goalW))));const trained=Object.entries(s.days).some(([d,v])=>d<=on&&d>=plusDays(on,-28)&&(v.sessions||[]).some(x=>x.items.some(i=>i.kind!=='cardio'&&(i.rounds||i.roundEntries?.some(z=>z.done||Number(z.rounds)>0)||i.sets?.some(z=>z.done||Number(z.reps)>0)))));let pRate=purpose==='maintain'?(trained?1.4:1):purpose==='loss'?1.4:purpose==='retain'?1.8:1.6;const protein=Math.min(ref*pRate,kcal*.35/4),fat=Math.max(kcal*.25/9,ref*.6),carbs=(kcal-protein*4-fat*9)/4;if(carbs<0)return {error:'この条件では提案を作れません。プロフィールを確認してください。'};return {value:{kcal,p:protein,f:fat,c:carbs,purpose},note:`提案用参照体重 ${ref.toFixed(1)} kg、P ${pRate} g/kg。体格による過大提案を避けるため参照体重にBMI 25相当の上限を設けています（本アプリの保守的な設計）。個人の処方ではありません。`}}
 function movingAverage(points,on){const values=points.filter(x=>x.date>=plusDays(on,-6)&&x.date<=on);return values.length?values.reduce((a,v)=>a+v.weight,0)/values.length:null}
-return {clone,factors,keys,meals,iso,date,plusDays,plusMonths,daysBetween,age,numeric,nonnegative,defaults,forearmNote,initialTemplates,fresh,validateStore,fromV1,migrate,normalizeDay,weightAt,baseEnergy,exerciseEnergy,foodTotals,energy,previous,allocate,goal,exercisePlan,goalAt,targetWeight,weekStart,week,suggestion,movingAverage};
+return {clone,factors,keys,meals,iso,date,plusDays,plusMonths,daysBetween,age,numeric,nonnegative,defaults,forearmNote,initialTemplates,fresh,validateStore,fromV1,migrate,auditExerciseIds,previewExerciseLibrary,exercisePresentation,normalizeDay,weightAt,baseEnergy,exerciseEnergy,foodTotals,energy,previous,allocate,goal,exercisePlan,goalAt,targetWeight,weekStart,week,suggestion,movingAverage};
 });
