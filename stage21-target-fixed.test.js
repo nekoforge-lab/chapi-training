@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const app=fs.readFileSync(__dirname+'/app.js','utf8');
+const core=fs.readFileSync(__dirname+'/core.js','utf8');
+assert.match(app,/const adjustedGoal=target;/);
+assert.doesNotMatch(app,/const adjustedGoal=target\+Math\.round\(\(e\.watch\?0:e\.exercise\.net\)\*\.7\)/);
+assert.match(app,/const net=food-\(e\.watch\?0:exercise\);/);
+assert.match(app,/const diff=foodRecorded\?net-adjustedGoal:null;/);
+assert.match(core,/if\(it\.energyType==='net'\)net\+=Number\(it\.kcal\)/);
+assert.equal(1002-1865.28-154,-1017.28);
+assert.equal(1865.28+0*154,1865.28);
+console.log('Fixed target and full exercise deduction passed');

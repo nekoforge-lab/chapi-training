@@ -101,8 +101,9 @@ function exerciseEnergy(d,bmr){let net=0,raw=0,missing=0,unresolved=0;
  if(hasStrength||numeric(strength.kcal))records.push(strength);
  for(const sess of d.sessions||[])for(const it of sess.items||[])if(it.kind==='cardio')records.push(it);
  for(const it of records){if(!numeric(it.kcal)){missing++;continue}raw+=Number(it.kcal);if(!nonnegative(it.kcal)){unresolved++;continue}
- if(it.energyType==='net')net+=Number(it.kcal);
- else if(it.energyType==='gross'&&nonnegative(it.minutes)&&Number(it.minutes)>0&&bmr)net+=Math.max(0,Number(it.kcal)-bmr*Number(it.minutes)/1440);
+ const rate=it===strength?0.7:1.0;
+ if(it.energyType==='net')net+=Number(it.kcal)*rate;
+ else if(it.energyType==='gross'&&nonnegative(it.minutes)&&Number(it.minutes)>0&&bmr)net+=Math.max(0,Number(it.kcal)-bmr*Number(it.minutes)/1440)*rate;
  else unresolved++}
  return {net,raw,missing,unresolved}}
 function foodTotals(d){const t={kcal:0,p:0,f:0,c:0},count={kcal:0,p:0,f:0,c:0};for(const [key] of meals)for(const f of Object.keys(t)){const meal=d.meals?.[key];const v=meal?.skipped?0:meal?.[f];if(meal?.skipped||nonnegative(v)){t[f]+=Number(v);count[f]++}}return {total:t,count,complete:['breakfast','lunch','dinner'].every(key=>{const m=d.meals?.[key];return !!m&&(m.skipped===true||nonnegative(m.kcal))}),hasMark:Object.values(d.meals||{}).some(m=>m&&Object.values(m).some(v=>v!==''))}}

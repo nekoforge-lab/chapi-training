@@ -10,5 +10,5 @@ for(const name of ['摂取カロリー','運動消費カロリー','生活消費
 assert(css.includes('.energy-dashboard .energy-metric-stack .energy-metric-label{\n  white-space:normal;max-width:100%;text-align:center;'));
 assert(html.includes('v3.9 正規版'));
 assert(html.includes('3.8.20-energy-labels'));
-assert(fs.readFileSync('sw.js','utf8').includes('chapi-fit-shell-v39-release'));
+assert(fs.readFileSync('sw.js','utf8').includes('chapi-fit-shell-v39-strength07'));
 console.log('stage20 label checks passed');
